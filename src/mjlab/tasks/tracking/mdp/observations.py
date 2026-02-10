@@ -109,76 +109,61 @@ import torch
 from typing import Dict
 
 
-def zmp(env: ManagerBasedRlEnv, force_threshold: float = 5.0) -> Dict[str, torch.Tensor]:
-  # --- 1. 资源提取 (假设数据已在正确的 device 上) ---
-  sensor = env.scene["feet_contact"]
-  data = sensor.data
+def zmp_dynamic_full(env: ManagerBasedRlEnv) -> torch.Tensor:
+  # --- 1. 资源提取 ---
   robot = env.scene["robot"]
-  device = env.device
   B = env.num_envs
-  # 直接使用原始引用，减少 .to(device) 的额外开销（Isaac Lab 默认在 GPU）
-  pos_w = data.pos[..., :2]  # [B, 14, 2]
-  forces_3d = data.force  # [B, 14, 3]
-  torques_3d = data.torque  # [B, 14, 3]
-  com_pos_w = robot.data.root_com_pos_w[:, :2]
-  # --- 2. 动态接触掩码 ---
-  fz = forces_3d[..., 2]
-  contact_mask = (fz > force_threshold).float()
-  total_fz = torch.sum(fz * contact_mask, dim=1, keepdim=True)
-  total_fz_safe = total_fz + 1e-6  # 提升稳定性
-  is_contact = total_fz.squeeze(-1) > 1e-4
-  # --- 3. 高效 ZMP 计算 (手写叉乘替代 torch.cross) ---
-  # ZMP_x = Σ(pos_x * fz - (pos_z - pz_avg) * fx - torque_y) / Σfz
-  # 这里为了极致简洁，我们直接利用你之前的力矩平衡公式
-  f_v = forces_3d * contact_mask.unsqueeze(-1)
-  t_v = torques_3d * contact_mask.unsqueeze(-1)
-  # 手写 2D 叉乘：(r.x * f.y - r.y * f.x) 对应力矩的 Z 分量
-  # 但 ZMP 需要的是水平力矩平衡，我们直接计算 num_x, num_y
-  # 注意：pos_z 相对偏移通常较小，但在地形不平时很重要
-  pz_rel = data.pos[..., 2] - torch.mean(data.pos[..., 2], dim=1, keepdim=True)
-  num_x = torch.sum((pos_w[..., 0] * fz - pz_rel * f_v[..., 0] - t_v[..., 1]) * contact_mask, dim=1)
-  num_y = torch.sum((pos_w[..., 1] * fz - pz_rel * f_v[..., 1] + t_v[..., 0]) * contact_mask, dim=1)
-  zmp_xy = torch.stack([num_x, num_y], dim=-1) / total_fz_safe
-  zmp_xy = torch.where(is_contact.unsqueeze(-1), zmp_xy, com_pos_w)
-  # --- 4. 无点序暴力凸包 (极致优化广播) ---
-  p1 = pos_w.unsqueeze(2)  # [B, 14, 1, 2]
-  p2 = pos_w.unsqueeze(1)  # [B, 1, 14, 2]
-  edge_vec = p2 - p1  # [B, 14, 14, 2]
-  # 边掩码：(i!=j) & active_i & active_j
-  edge_active = contact_mask.unsqueeze(2) * contact_mask.unsqueeze(1)
-  edge_active.diagonal(dim1=1, dim2=2).fill_(0)
-  # 4.1 批量叉乘判定 Hull Edge
-  # 计算 (p2-p1) x (pk-p1)
-  # 使用广播直接生成 [B, 14, 14, 14]
-  rel_pk = pos_w.view(B, 1, 1, 14, 2) - p1.unsqueeze(3)
-  # 手写 2D 叉乘替代 torch.cross 以提速 3-5 倍
-  cross_all = edge_vec[..., 0:1] * rel_pk[..., 1] - edge_vec[..., 1:2] * rel_pk[..., 0]
-  cross_all = cross_all * contact_mask.view(B, 1, 1, 14)
-  # 4.2 判定边界
-  is_hull_edge = ((torch.all(cross_all >= -1e-5, dim=3) |
-                   torch.all(cross_all <= 1e-5, dim=3)) & (edge_active > 0.5))
-  # 4.3 计算符号距离
-  zmp_rel = zmp_xy.view(B, 1, 1, 2) - p1
-  zmp_cross = edge_vec[..., 0] * zmp_rel[..., 1] - edge_vec[..., 1] * zmp_rel[..., 0]
-  # 统一符号：正代表凸包内，负代表凸包外
-  hull_sign = torch.sign(torch.sum(cross_all, dim=3))
-  dist = (zmp_cross / (torch.norm(edge_vec, dim=-1) + 1e-8)) * hull_sign
-  # 4.4 提取最小余量
-  valid_dist = torch.where(is_hull_edge, dist, torch.tensor(1e6, device=device))
-  stability_margin, _ = torch.min(valid_dist.view(B, -1), dim=1)
-  # --- 5. 状态融合与兜底 ---
-  active_num = torch.sum(contact_mask, dim=1)
-  has_hull = active_num >= 3
-  stability_margin = torch.where(has_hull, stability_margin,
-                                 torch.where(is_contact, torch.tensor(-0.05, device=device),
-                                             torch.tensor(-0.1, device=device)))
+  device = env.device
 
-  # return {
-  #   "zmp_xy": zmp_xy,
-  #   "stability_margin": stability_margin,
-  #   "is_contact": is_contact,
-  #   "active_l": torch.any(contact_mask[:, :7] > 0.5, dim=1),
-  #   "active_r": torch.any(contact_mask[:, 7:] > 0.5, dim=1),
-  #   "total_fz": total_fz.squeeze(-1)
-  # }
-  return  zmp_xy
+  # 获取质心 (CoM) 的世界坐标系状态
+  # root_com_pos_w: [B, 3]
+  # root_com_lin_vel_w: [B, 3] -> 用于计算加速度
+  com_pos = robot.data.root_com_pos_w
+  com_vel = robot.data.root_com_lin_vel_w
+
+  # 模拟加速度 (或者直接从 robot.data 中获取，如果 Isaac 版本支持)
+  # 在 RL 步进中，通常用 (vel - prev_vel) / dt
+  dt = env.physics_dt
+  com_acc = (com_vel - getattr(env, "_prev_com_vel", com_vel)) / dt
+  env._prev_com_vel = com_vel.clone()  # 缓存用于下一帧计算
+
+  # --- 2. 提取角动量导数 (L_dot) ---
+  # 这是处理“肢体甩动”和“空翻”的核心项
+  # h_dot = dL/dt. 在 Isaac Lab 中可以通过 center_of_mass_ang_mom 的差分获得
+  ang_mom = robot.data.root_com_ang_mom_w  # [B, 3]
+  ang_mom_dot = (ang_mom - getattr(env, "_prev_ang_mom", ang_mom)) / dt
+  env._prev_ang_mom = ang_mom.clone()
+
+  # --- 3. 完整动力学计算 ---
+  # 公式: P_zmp = P_com - (z_com / (z_acc + g)) * x_acc - (L_dot / (m * (z_acc + g)))
+  g = 9.81
+  m = robot.data.default_mass.unsqueeze(-1)  # [B, 1]
+
+  # 垂直分母: m * (z_acc + g)
+  # 这代表了有效支撑力。如果为0，说明机器人处于完全失重状态
+  denom = m * (com_acc[:, 2:3] + g)
+  denom_safe = torch.where(denom.abs() < 1e-2, torch.sign(denom) * 1e-2, denom)
+
+  z_ref = com_pos[:, 2:3]  # 以质心高度作为参考
+
+  # ZMP X 分量 (对应力矩 Y 的平衡)
+  # x_zmp = x_com - (z_com * m * x_acc + L_dot_y) / denom
+  zmp_x = com_pos[:, 0:1] - (z_ref * m * com_acc[:, 0:1] + ang_mom_dot[:, 1:2]) / denom_safe
+
+  # ZMP Y 分量 (对应力矩 X 的平衡)
+  # y_zmp = y_com - (z_com * m * y_acc - L_dot_x) / denom
+  zmp_y = com_pos[:, 1:2] - (z_ref * m * com_acc[:, 1:2] - ang_mom_dot[:, 0:1]) / denom_safe
+
+  # --- 4. 极端动态修正 ---
+  # 如果机器人处于空中（没有脚触地），ZMP 理论上无定义。
+  # 我们检测总垂直力（如果有传感器）或直接用加速度判定。
+  feet_fz = env.scene["feet_contact"].data.force[..., 2]
+  is_airborne = torch.sum(feet_fz, dim=1, keepdim=True) < 1.0  # 阈值 1N
+
+  zmp_xy = torch.cat([zmp_x, zmp_y], dim=-1)
+
+  # 腾空时回归 CoM 投影
+  zmp_xy = torch.where(is_airborne, com_pos[:, :2], zmp_xy)
+
+  return zmp_xy
+

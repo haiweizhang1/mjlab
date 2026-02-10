@@ -108,11 +108,11 @@ Train a Unitree G1 to mimic reference motions. mjlab uses
 3. **Process and upload motion files**:
    ```bash
    MUJOCO_GL=egl uv run src/mjlab/scripts/csv_to_npz.py \
-     --input-file /path/to/motion.csv \
-     --output-name motion_name \
+     --input-file /home/droid/PycharmProjects/Retarget_Motion_Lafan1/hum_motion/bruce_lee.csv \
+     --output-name bruce_lee \
      --input-fps 30 \
      --output-fps 50 \
-     --render  # Optional: generates preview video
+     --render True  # Optional: generates preview video
    ```
 
 > [!NOTE]
@@ -122,10 +122,12 @@ Train a Unitree G1 to mimic reference motions. mjlab uses
 #### Train and Play
 
 ```bash
-uv run train Mjlab-Tracking-Flat-Unitree-G1 --registry-name your-org/motions/motion-name --env.scene.num-envs 4096
+uv run train Mjlab-Tracking-Flat-Unitree-G1   --env.scene.num-envs 4096 --env.commands.motion.motion-file  --video True
 
 uv run play Mjlab-Tracking-Flat-Unitree-G1 --wandb-run-path your-org/mjlab/run-id
 ```
+ uv run train Mjlab-Tracking-Flat-Droid-X3  --env.scene.num-envs 4096 --env.commands.motion.motion-file /home/droid/PycharmProjects/mjlab/motion/daoma_dance_model_01_15.npz
+
 
 ---
 

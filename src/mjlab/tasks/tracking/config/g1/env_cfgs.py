@@ -29,7 +29,39 @@ def unitree_g1_flat_tracking_env_cfg(
     reduce="none",
     num_slots=1,
   )
-  cfg.scene.sensors = (self_collision_cfg,)
+  # 1. 定义脚部接触传感器 (Primary)
+  feet_contact_cfg = ContactSensorCfg(
+    name="feet_contact",
+    primary=ContactMatch(
+      mode="geom",
+      pattern=r"^(left|right)_foot[1-7]_collision$",
+      entity="robot"
+    ),
+    # 修复：完全移除 secondary 或将其设为 None
+    # 这将捕捉脚部与世界上任何物体的接触
+    secondary=ContactMatch(mode="body", pattern="terrain"),
+    fields=("found", "force", "torque", "pos", "normal", "tangent"),
+    reduce="none",
+    global_frame=True,
+    track_air_time=True
+  )
+
+  # feet_contact_cfg = ContactSensorCfg(
+  #   name="feet_contact",
+  #   primary=ContactMatch(
+  #     mode="body",
+  #     pattern=r"^(left|right)_foot[1-7]_collision$",
+  #     entity="robot"
+  #   ),
+  #   # 修复：完全移除 secondary 或将其设为 None
+  #   # 这将捕捉脚部与世界上任何物体的接触
+  #   secondary=ContactMatch(mode="body", pattern="terrain"),
+  #   fields=("found", "force", "torque", "pos", "normal", "tangent"),
+  #   reduce="none",
+  #   global_frame=True,
+  #   track_air_time=True
+  # )
+  cfg.scene.sensors = (self_collision_cfg,feet_contact_cfg)
 
   joint_pos_action = cfg.actions["joint_pos"]
   assert isinstance(joint_pos_action, JointPositionActionCfg)
@@ -60,12 +92,12 @@ def unitree_g1_flat_tracking_env_cfg(
   ].geom_names = r"^(left|right)_foot[1-7]_collision$"
   cfg.events["base_com"].params["asset_cfg"].body_names = ("torso_link",)
 
-  cfg.terminations["ee_body_pos"].params["body_names"] = (
-    "left_ankle_roll_link",
-    "right_ankle_roll_link",
-    "left_wrist_yaw_link",
-    "right_wrist_yaw_link",
-  )
+  # cfg.terminations["ee_body_pos"].params["body_names"] = (
+  #   "left_ankle_roll_link",
+  #   "right_ankle_roll_link",
+  #   "left_wrist_yaw_link",
+  #   "right_wrist_yaw_link",
+  # )
 
   cfg.viewer.body_name = "torso_link"
 

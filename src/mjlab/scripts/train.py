@@ -27,8 +27,8 @@ class TrainConfig:
   agent: RslRlOnPolicyRunnerCfg
   registry_name: str | None = None
   video: bool = False
-  video_length: int = 200
-  video_interval: int = 2000
+  video_length: int = 2000
+  video_interval: int = 500
   enable_nan_guard: bool = False
   torchrunx_log_dir: str | None = None
   wandb_run_path: str | None = None

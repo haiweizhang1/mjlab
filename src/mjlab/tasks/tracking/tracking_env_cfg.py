@@ -27,19 +27,19 @@ from mjlab.utils.noise import UniformNoiseCfg as Unoise
 from mjlab.viewer import ViewerConfig
 
 VELOCITY_RANGE = {
-  "x": (-0.5, 0.5),
-  "y": (-0.5, 0.5),
-  "z": (-0.2, 0.2),
-  "roll": (-0.52, 0.52),
-  "pitch": (-0.52, 0.52),
-  "yaw": (-0.78, 0.78),
+  "x": (-0.05, 0.05),
+  "y": (-0.05, 0.05),
+  "z": (-0.02, 0.02),
+  "roll": (-0.052, 0.052),
+  "pitch": (-0.052, 0.052),
+  "yaw": (-0.078, 0.078),
 }
 
 
 def make_tracking_env_cfg() -> ManagerBasedRlEnvCfg:
   """Create base tracking task configuration."""
 
-  ##
+
   # Observations
   ##
 
@@ -76,7 +76,13 @@ def make_tracking_env_cfg() -> ManagerBasedRlEnvCfg:
       func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.5, n_max=0.5)
     ),
     "actions": ObservationTermCfg(func=mdp.last_action),
+
+  #   "zmp": ObservationTermCfg(
+  #     func=mdp.zmp
+  #   ),
   }
+
+
 
   critic_terms = {
     "command": ObservationTermCfg(
@@ -251,6 +257,11 @@ def make_tracking_env_cfg() -> ManagerBasedRlEnvCfg:
       weight=-10.0,
       params={"sensor_name": "self_collision"},
     ),
+    # "zmp_blance": RewardTermCfg(
+    #   func=mdp.zmp_reward,
+    #   weight=1.0,
+    #   params={"threshold":0.02},
+    # ),
   }
 
   ##

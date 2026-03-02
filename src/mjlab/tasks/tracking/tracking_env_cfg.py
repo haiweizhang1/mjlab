@@ -173,7 +173,7 @@ def make_tracking_env_cfg() -> ManagerBasedRlEnvCfg:
     "push_robot": EventTermCfg(
       func=mdp.push_by_setting_velocity,
       mode="interval",
-      interval_range_s=(0,0.5),
+      interval_range_s=(1.0, 3.0),
       params={"velocity_range": VELOCITY_RANGE},
     ),
     "base_com": EventTermCfg(
@@ -264,16 +264,6 @@ def make_tracking_env_cfg() -> ManagerBasedRlEnvCfg:
     #   weight=1.0,
     #   params={"threshold":0.02},
     # ),
-    "zmp_outside_penalty" : RewardTermCfg(
-      func=mdp.zmp_outside_penalty,
-      weight=1.0,
-       ),
-
-    "zmp_stability_reward": RewardTermCfg(
-      func=mdp.zmp_stability_reward,
-      weight=1.0,
-      params={"max_dist":0.1}, ),
-  #
   }
 
   ##

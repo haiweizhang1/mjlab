@@ -127,12 +127,12 @@ class IdealPdActuator(Actuator, Generic[IdealPdCfgT]):
     if kp is not None:
       if kp.ndim == 1:
         kp = kp.unsqueeze(-1)
-      self.stiffness[env_ids] = kp
+      self.stiffness[env_ids] = kp+self.default_stiffness
 
     if kd is not None:
       if kd.ndim == 1:
         kd = kd.unsqueeze(-1)
-      self.damping[env_ids] = kd
+      self.damping[env_ids] = kd+self.default_damping
 
   def set_effort_limit(
     self, env_ids: torch.Tensor | slice, effort_limit: torch.Tensor

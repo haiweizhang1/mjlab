@@ -214,96 +214,117 @@ def self_collision_cost(env: ManagerBasedRlEnv, sensor_name: str) -> torch.Tenso
 #   reward = torch.where(margin > 0, reward_inside, penalty_outside)
 #   # 过滤掉完全没接触的情况（腾空期不计入此奖励，或给个中性值）
 #   return torch.where(metrics["is_contact"], reward, torch.zeros_like(reward))
-
-
-
-def compute_zmp_mjlab(env: ManagerBasedRlEnv, force_threshold: float = 5.0):
-    """适配 mjlab 的 ZMP 计算逻辑"""
-    # 提取传感器数据
-    # mjlab 的接触传感器通常返回 force, pos, torque 等 Tensor
-    sensor = env.scene["feet_contact"]
-    robot = env.scene["robot"]
-    B = env.num_envs
-    device = env.device
-
-    # 数据提取 (注意：mjlab/IsaacLab 的 force 维度通常是 [B, num_sensors, 3])
-    forces_z = sensor.data.force[..., 2]  # [B, num_feet]
-    pos_w = sensor.data.pos[..., :2]  # [B, num_feet, 2]
-    torque_x = sensor.data.torque[..., 0]
-    torque_y = sensor.data.torque[..., 1]
-    robot_com = robot.data.root_com_pose_w[:, :2]  # [B, 2]
-
-    # 1. 接触掩码处理 (Bool型用于逻辑，Float型用于计算)
-    mask_bool = (forces_z > force_threshold)
-    mask = mask_bool.float()
-
-    # 假设前 N/2 是左脚，后 N/2 是右脚 (请根据你的 MJCF 修改索引)
-    num_sensors = forces_z.shape[1]
-    mid = num_sensors // 2
-    mask_l, mask_r = mask[:, :mid], mask[:, mid:]
-
-    has_contact_l = (torch.sum(mask_l, dim=1) > 0.5)
-    has_contact_r = (torch.sum(mask_r, dim=1) > 0.5)
-
-    # 2. ZMP 核心计算 (添加 eps 防止除以 0)
-    eps = 1e-6
-    total_fz = torch.clamp(torch.sum(forces_z * mask, dim=1, keepdim=True), min=eps)
-    total_torque_x = torch.sum(torque_x * mask, dim=1, keepdim=True)
-    total_torque_y = torch.sum(torque_y * mask, dim=1, keepdim=True)
-
-    # 加权平均位置
-    sum_mask = torch.clamp(torch.sum(mask, dim=1, keepdim=True), min=eps)
-    pos_weighted = torch.sum(pos_w * mask.unsqueeze(-1), dim=1) / sum_mask
-
-    # ZMP 公式: x_zmp = x_p - tau_y/Fz, y_zmp = y_p + tau_x/Fz
-    zmp_offset = torch.cat([-total_torque_y / total_fz, total_torque_x / total_fz], dim=-1)
-    zmp_xy_raw = pos_weighted + zmp_offset
-
-    # 3. 计算支撑区域 (AABB 简化版)
-    mask_expand = mask_bool.unsqueeze(-1).expand(-1, -1, 2)
-    # 计算接触点的外接矩形
-    pos_inf = torch.full_like(pos_w, float('inf'))
-    min_xy = torch.min(torch.where(mask_expand, pos_w, pos_inf), dim=1).values
-    max_xy = torch.max(torch.where(mask_expand, pos_w, -pos_inf), dim=1).values
-
-    # 支撑中心
-    support_center = (min_xy + max_xy) / 2.0
-
-    # 4. 判断 ZMP 是否在支撑域内
-    zmp_inside = (zmp_xy_raw[:, 0] >= min_xy[:, 0]) & (zmp_xy_raw[:, 0] <= max_xy[:, 0]) & \
-                 (zmp_xy_raw[:, 1] >= min_xy[:, 1]) & (zmp_xy_raw[:, 1] <= max_xy[:, 1])
-
-    # 如果全离地，强制判定为不在域内
-    any_contact = (torch.sum(mask, dim=1) > 0.5)
-    zmp_inside = zmp_inside & any_contact
-
-    return {
-        "zmp_inside": zmp_inside,
-        "zmp_to_center_dist": torch.norm(zmp_xy_raw - support_center, p=2, dim=-1),
-        "any_contact": any_contact
-    }
-
-# 惩罚/奖励函数无需修改
-def zmp_stability_reward(env: ManagerBasedRlEnv,  max_dist: float = 0.1) -> torch.Tensor:
-    """
-    ZMP 稳定性奖励：
-    1. 在支撑域内：给予基于到中心距离的奖励
-    2. 在支撑域外：奖励为 0 或负值
-    """
-    data = compute_zmp_mjlab(env)
-
-    # 距离惩罚项 (Exponential 形式通常比 Linear 效果更好)
-    reward = torch.exp(-data["zmp_to_center_dist"] / max_dist)
-
-    # 只有在有接触且在域内时才给奖励
-    reward = torch.where(data["zmp_inside"], reward, torch.zeros_like(reward))
-
-    return reward
-
-
-def zmp_outside_penalty(env: ManagerBasedRlEnv) -> torch.Tensor:
-    """ZMP 越界惩罚"""
-    data = compute_zmp_mjlab(env)
-    # 如果有接触但 ZMP 跑出去了，给惩罚
-    penalty = (data["any_contact"] & ~data["zmp_inside"]).float()
-    return penalty
+#
+#
+# def compute_zmp_mjlab(env: ManagerBasedRlEnv, force_threshold: float = 5.0):
+#     """适配 mjlab 的 ZMP 计算逻辑（简化支撑域：近似四边形+单脚脚掌范围）"""
+#     # 提取传感器数据
+#     sensor = env.scene["feet_contact"]
+#     robot = env.scene["robot"]
+#     B = env.num_envs
+#     device = env.device
+#
+#     # 数据提取 (注意：mjlab/IsaacLab 的 force 维度通常是 [B, num_sensors, 3])
+#     forces_z = sensor.data.force[..., 2]  # [B, num_feet]
+#     pos_w = sensor.data.pos[..., :2]  # [B, num_feet, 2]
+#     torque_x = sensor.data.torque[..., 0]
+#     torque_y = sensor.data.torque[..., 1]
+#     robot_com = robot.data.root_com_pose_w[:, :2]  # [B, 2]
+#
+#     # 1. 接触掩码处理 (Bool型用于逻辑，Float型用于计算)
+#     mask_bool = (forces_z > force_threshold)
+#     mask = mask_bool.float()
+#
+#     # 假设前 N/2 是左脚，后 N/2 是右脚 (请根据你的 MJCF 修改索引)
+#     num_sensors = forces_z.shape[1]
+#     mid = num_sensors // 2
+#     mask_l, mask_r = mask[:, :mid], mask[:, mid:]
+#
+#     # 标记支撑状态：单左脚/单右脚/双腿/无接触
+#     has_contact_l = (torch.sum(mask_l, dim=1) > 0.5)  # 左脚接触
+#     has_contact_r = (torch.sum(mask_r, dim=1) > 0.5)  # 右脚接触
+#     has_single_leg = (has_contact_l ^ has_contact_r)  # 单脚支撑（异或：仅一只脚接触）
+#     has_single_l = has_contact_l & ~has_contact_r     # 仅左脚支撑
+#     has_single_r = has_contact_r & ~has_contact_l     # 仅右脚支撑
+#     any_contact = (torch.sum(mask, dim=1) > 0.5)      # 有接触（单/双腿）
+#
+#     # 2. ZMP 核心计算 (保持原有逻辑不变)
+#     eps = 1e-6
+#     total_fz = torch.clamp(torch.sum(forces_z * mask, dim=1, keepdim=True), min=eps)
+#     total_torque_x = torch.sum(torque_x * mask, dim=1, keepdim=True)
+#     total_torque_y = torch.sum(torque_y * mask, dim=1, keepdim=True)
+#
+#     # 加权平均位置
+#     sum_mask = torch.clamp(torch.sum(mask, dim=1, keepdim=True), min=eps)
+#     pos_weighted = torch.sum(pos_w * mask.unsqueeze(-1), dim=1) / sum_mask
+#
+#     # ZMP 公式: x_zmp = x_p - tau_y/Fz, y_zmp = y_p + tau_x/Fz
+#     zmp_offset = torch.cat([-total_torque_y / total_fz, total_torque_x / total_fz], dim=-1)
+#     zmp_xy_raw = pos_weighted + zmp_offset
+#
+#     # 3. 简化支撑域计算（近似四边形）
+#     # 定义脚掌尺寸（单位：米，根据机器人实际脚掌调整）
+#     foot_length = 0.1   # 脚掌前后长度（y轴）
+#     foot_width = 0.06   # 脚掌左右宽度（x轴）
+#     foot_half_len = foot_length / 2.0
+#     foot_half_wid = foot_width / 2.0
+#
+#     # 初始化支撑域极值和中心
+#     min_xy = torch.zeros(B, 2, device=device)
+#     max_xy = torch.zeros(B, 2, device=device)
+#     support_center = torch.zeros(B, 2, device=device)
+#
+#     # 单左脚支撑：以左脚接触点均值为中心，覆盖整个左脚掌范围（近似四边形）
+#     l_foot_center = torch.sum(pos_w[:, :mid] * mask_l.unsqueeze(-1), dim=1) / torch.clamp(torch.sum(mask_l, dim=1, keepdim=True), min=eps)
+#     min_xy_l = l_foot_center - torch.tensor([foot_half_wid, foot_half_len], device=device)
+#     max_xy_l = l_foot_center + torch.tensor([foot_half_wid, foot_half_len], device=device)
+#
+#     # 单右脚支撑：以右脚接触点均值为中心，覆盖整个右脚掌范围（近似四边形）
+#     r_foot_center = torch.sum(pos_w[:, mid:] * mask_r.unsqueeze(-1), dim=1) / torch.clamp(torch.sum(mask_r, dim=1, keepdim=True), min=eps)
+#     min_xy_r = r_foot_center - torch.tensor([foot_half_wid, foot_half_len], device=device)
+#     max_xy_r = r_foot_center + torch.tensor([foot_half_wid, foot_half_len], device=device)
+#
+#     # 赋值支撑域（仅单脚支撑时生效，其他情况设为0）
+#     # 单左脚支撑
+#     min_xy = torch.where(has_single_l.unsqueeze(-1), min_xy_l, min_xy)
+#     max_xy = torch.where(has_single_l.unsqueeze(-1), max_xy_l, max_xy)
+#     support_center = torch.where(has_single_l.unsqueeze(-1), l_foot_center, support_center)
+#     # 单右脚支撑
+#     min_xy = torch.where(has_single_r.unsqueeze(-1), min_xy_r, min_xy)
+#     max_xy = torch.where(has_single_r.unsqueeze(-1), max_xy_r, max_xy)
+#     support_center = torch.where(has_single_r.unsqueeze(-1), r_foot_center, support_center)
+#
+#     # 4. 判断 ZMP 是否在单脚支撑域内（仅单脚支撑时判定）
+#     zmp_inside_single_leg = (zmp_xy_raw[:, 0] >= min_xy[:, 0]) & (zmp_xy_raw[:, 0] <= max_xy[:, 0]) & \
+#                             (zmp_xy_raw[:, 1] >= min_xy[:, 1]) & (zmp_xy_raw[:, 1] <= max_xy[:, 1])
+#     # 仅单脚支撑且有接触时，判定结果有效；其他情况为False
+#     zmp_inside = zmp_inside_single_leg & has_single_leg & any_contact
+#
+#     return {
+#         "zmp_inside": zmp_inside,                # 仅单脚支撑时ZMP是否在支撑域内
+#         "zmp_to_center_dist": torch.norm(zmp_xy_raw - support_center, p=2, dim=-1),  # ZMP到支撑域中心距离
+#         "any_contact": any_contact,              # 是否有接触
+#         "has_single_leg": has_single_leg         # 是否单脚支撑
+#     }
+#
+# def zmp_stability_reward(env: ManagerBasedRlEnv,  max_dist: float = 0.1) -> torch.Tensor:
+#     """
+#     ZMP 稳定性奖励：仅在单脚支撑且ZMP在支撑域内时，给予基于距离的奖励
+#     """
+#     data = compute_zmp_mjlab(env)
+#
+#     # 距离惩罚项 (指数形式，距离中心越近奖励越高)
+#     reward = torch.exp(-data["zmp_to_center_dist"] / max_dist)
+#
+#     # 仅在「单脚支撑 + ZMP在支撑域内」时给予奖励，其他情况奖励为0
+#     reward = torch.where(data["zmp_inside"], reward, torch.zeros_like(reward))
+#
+#     return reward
+#
+#
+# def zmp_outside_penalty(env: ManagerBasedRlEnv) -> torch.Tensor:
+#     """ZMP 越界惩罚"""
+#     data = compute_zmp_mjlab(env)
+#     # 如果有接触但 ZMP 跑出去了，给惩罚
+#     penalty = (data["any_contact"] & ~data["zmp_inside"]).float()
+#     return penalty

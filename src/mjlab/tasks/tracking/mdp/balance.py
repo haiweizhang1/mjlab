@@ -7,14 +7,14 @@ import torch
 from mjlab.sensor import ContactSensor
 from mjlab.utils.lab_api.math import (
   matrix_from_quat,
-  subtract_frame_transforms, default_orientation,
+  subtract_frame_transforms,
 )
+
 
 from .commands import MotionCommand
 
 if TYPE_CHECKING:
   from mjlab.envs import ManagerBasedRlEnv
-
 
 
 #############center of mass#####################
@@ -26,298 +26,151 @@ def center_of_mass(env: ManagerBasedRlEnv, command_name: str) -> torch.Tensor:
 
 ############zmp###############################
 import torch
+from typing import cast
 
 
-def compute_zmp_and_margin(env, force_threshold: float = 5.0):
-  sensor = env.scene["feet_contact"]
-  robot = env.scene["robot"]
-  device = env.device
-  B = env.num_envs
+# 假设这些类已经在你的环境中定义
+# from omni.isaac.lab.envs import ManagerBasedRlEnv
+# from your_project.commands import MotionCommand
 
-  # 1. 提取力与位置 (假设 0-6 为左脚, 7-13 为右脚)
-  forces_z = sensor.data.force[..., 2]
-  pos_w = sensor.data.pos[..., :2]
-  mask = (forces_z > force_threshold).float()
-
-  # 2. 状态判定
-  contact_l = (torch.sum(mask[:, :7], dim=1) > 0)
-  contact_r = (torch.sum(mask[:, 7:], dim=1) > 0)
-
-  # 腾空标志: 0, 单脚: 1, 双脚: 2
-  contact_state = contact_l.float() + contact_r.float()
-
-  # 3. ZMP 计算 (保持原逻辑，优化求和)
-  total_fz = torch.sum(forces_z * mask, dim=1, keepdim=True) + 1e-6
-  zmp_xy = torch.sum(pos_w * forces_z.unsqueeze(-1) * mask.unsqueeze(-1), dim=1) / total_fz
-
-  # 4. 支撑域与余量 (Stability Margin) 计算
-  # 技巧：不再计算动态凸包，而是提取活跃脚的“边界点”
-  # 假设每只脚通过传感器能拿到 4 个角点坐标（或通过机器人运动学计算）
-  # 这里我们简化为直接提取当前活跃的接触点作为支撑点
-
-  margin = torch.full((B,), -0.1, device=device)  # 默认值（腾空）
-
-  # --- 逻辑分支优化 ---
-
-  # CASE 1: 单脚支撑 (使用 AABB 或简单的距离判定)
-  single_mask = (contact_state == 1)
-  if single_mask.any():
-    # 提取活跃脚的所有接触点
-    # 简化：对于单脚，margin 可以近似为 ZMP 到该脚接触点质心的距离限制
-    # 或者计算 ZMP 到该脚所有活跃接触点连线的最小距离
-    pass
-
-    # CASE 2: 双脚支撑 (核心挑战)
-  # 改进方案：对于双足，直接取左右脚的最外侧 4 个关键点（脚尖、脚跟的内外侧）
-  # 这样 N 永久等于 8，计算开销恒定
-  double_mask = (contact_state == 2)
-  if double_mask.any():
-    # 提取 8 个关键点 [B_double, 8, 2]
-    # 使用固定的 8 点 Graham Scan 或直接利用双足间距计算
-    # 针对舞蹈动作，重心通常在两脚连线附近
-    pass
-
-  # --- 极致简化版：SDF 投影法 ---
-  # 将 ZMP 投影到“左脚中心”和“右脚中心”的连线上
-  # 这是高动态任务中最有效的简化观测
-  foot_l_com = torch.sum(pos_w[:, :7] * mask[:, :7].unsqueeze(-1), dim=1) / (
-            torch.sum(mask[:, :7], dim=1, keepdim=True) + 1e-6)
-  foot_r_com = torch.sum(pos_w[:, 7:] * mask[:, 7:].unsqueeze(-1), dim=1) / (
-            torch.sum(mask[:, 7:], dim=1, keepdim=True) + 1e-6)
-
-  # 计算 ZMP 到双脚连线的垂直距离和投影位置
-  line_vec = foot_r_com - foot_l_com
-  line_len_sq = torch.sum(line_vec ** 2, dim=-1) + 1e-6
-  relative_zmp = zmp_xy - foot_l_com
-  projection = torch.sum(relative_zmp * line_vec, dim=-1) / line_len_sq
-
-  # 此时 projection 在 [0, 1] 之间代表在双脚之间
-  # 这是一个非常强的平衡特征，适合作为模仿学习的 Observation
-
-  return {
-    "zmp_xy": zmp_xy,
-    "contact_state": contact_state,  # 0:空, 1:单, 2:双
-    "zmp_projection": projection,  # 平衡比例：0(全在左), 1(全在右)
-    "foot_dist": torch.sqrt(line_len_sq)
-  }
-
-import torch
-#基础力版（仅接触力加权，无任何修正）
-def compute_zmp_force_only(env:ManagerBasedRlEnv, force_threshold: float = 5.0):
-  """
-  ZMP版本1：仅接触力加权平均（最简化，无力矩/动量）
-  适用场景：低速/静态动作，仅反映重心偏向
-  """
-  sensor = env.scene["feet_contact"]
-  robot = env.scene["robot"]
-  device = env.device
-  B = env.num_envs
-
-  # 1. 基础数据提取
-  forces_z = sensor.data.force[..., 2]  # [B, 14] 垂直接触力
-  pos_w = sensor.data.pos[..., :2]      # [B, 14, 2] 接触点xy坐标
-  mask = (forces_z > force_threshold).float().clamp(min=1e-6)  # [B, 14]
-
-  # 2. 接触状态判定
-  contact_l = (torch.sum(mask[:, :7], dim=1) > 1e-3)
-  contact_r = (torch.sum(mask[:, 7:], dim=1) > 1e-3)
-  contact_state = contact_l.float() + contact_r.float()
-
-  # 3. 基础力版ZMP（仅力加权）
-  total_fz = torch.sum(forces_z * mask, dim=1, keepdim=True) + 1e-6  # [B, 1]
-  zmp_xy = torch.sum(pos_w * (forces_z * mask).unsqueeze(-1), dim=1) / total_fz  # [B, 2]
-
-  # 4. 核心特征（重心偏向）
-  sum_mask_l = torch.sum(mask[:, :7], dim=1, keepdim=True) + 1e-6
-  foot_l_com = torch.sum(pos_w[:, :7] * mask[:, :7].unsqueeze(-1), dim=1) / sum_mask_l
-  sum_mask_r = torch.sum(mask[:, 7:], dim=1, keepdim=True) + 1e-6
-  foot_r_com = torch.sum(pos_w[:, 7:] * mask[:, 7:].unsqueeze(-1), dim=1) / sum_mask_r
-
-  line_vec = foot_r_com - foot_l_com
-  line_len_sq = torch.sum(line_vec ** 2, dim=-1) + 1e-6
-  relative_zmp = zmp_xy - foot_l_com
-  projection = torch.sum(relative_zmp * line_vec, dim=-1) / line_len_sq
-  projection = torch.clamp(projection, -0.2, 1.2)
-
-  return {
-    "zmp_xy": zmp_xy,
-    "contact_state": contact_state,
-    "zmp_projection": projection,
-    "foot_dist": torch.sqrt(line_len_sq),
-    "version": "force_only"
-  }
-#力矩版（加入地面反作用力矩修正）import torch
-import torch
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def compute_zmp_with_quad_and_reward(env, force_threshold: float = 5.0):
+def zmp(env: ManagerBasedRlEnv, command_name: str = "motion") -> torch.Tensor:
     """
-    ZMP版本2 + 支撑四边形 + ZMP与支撑中心距离
-    支撑中心距离可直接用于奖励计算
+    计算机器人的零力矩点 (ZMP)。
+
+    公式:
+        ZMP_x = sum(x_i * f_z_i - tau_y_i) / sum(f_z_i)
+        ZMP_y = sum(y_i * f_z_i + tau_x_i) / sum(f_z_i)
+
+    Args:
+        env: 强化学习环境实例
+        command_name: 命令名称
+
+    Returns:
+        zmp_pos: [Batch, 2] ZMP在世界坐标系下的 (x, y) 位置
     """
+    # --- 0. 获取环境对象 ---
+    # 根据你的 snippet，假设已经正确获取了 sensor 和 robot
     sensor = env.scene["feet_contact"]
-    robot = env.scene["robot"]
-    B = env.num_envs
+    # --- 1. 基础数据提取 ---
+    # sensor.data.force: [Batch, Num_Sensors, 3]
+    # sensor.data.pos:   [Batch, Num_Sensors, 3] (世界坐标系)
+    # sensor.data.torque:[Batch, Num_Sensors, 3]
+    forces_z = sensor.data.force[..., 2]  # [B, 14], 垂直方向力 (f_z)
+    pos_x = sensor.data.pos[..., 0]  # [B, 14], 接触点 x 坐标 (x_i)
+    pos_y = sensor.data.pos[..., 1]  # [B, 14], 接触点 y 坐标 (y_i)
 
-    # 1. 基础数据
-    forces_z = sensor.data.force[..., 2]  # [B, 14]
-    pos_w = sensor.data.pos[..., :2]      # [B, 14, 2]
-    torque_x = sensor.data.torque[..., 0]
-    torque_y = sensor.data.torque[..., 1]
+    torque_x = sensor.data.torque[..., 0]  # [B, 14], 绕 x 轴力矩 (tau_x)
+    torque_y = sensor.data.torque[..., 1]  # [B, 14], 绕 y 轴力矩 (tau_y)
+    # --- 2. 创建 Mask (重要) ---
+    # 只有接触地面的点才贡献 ZMP。通常用一个小的力阈值来过滤噪声。
+    CONTACT_FORCE_THRESHOLD = 1.0  # 根据仿真器单位调整，通常是 1N
+    mask = (forces_z > CONTACT_FORCE_THRESHOLD).float()  # [B, 14]
+    # --- 3. 计算分母：总垂直力 ---
+    # sum(f_z_i)
+    # 加上 1e-6 防止除以零（当机器人完全腾空时）
+    total_fz = torch.sum(forces_z * mask, dim=1, keepdim=True) + 1e-6  # [B, 1]
+    # --- 4. 计算分子：力矩平衡项 ---
+    # 分子 X: sum(x_i * f_z_i - tau_y_i)
+    # 注意: 绕Y轴的正力矩会倾向于将ZMP推向负X方向，所以是减号
+    numerator_x = torch.sum((pos_x * forces_z - torque_y) * mask, dim=1, keepdim=True)
+    # 分子 Y: sum(y_i * f_z_i + tau_x_i)
+    # 注意: 绕X轴的正力矩会倾向于将ZMP推向正Y方向，所以是加号
+    numerator_y = torch.sum((pos_y * forces_z + torque_x) * mask, dim=1, keepdim=True)
+    # --- 5. 计算 ZMP 坐标 ---
+    zmp_x = numerator_x / total_fz
+    zmp_y = numerator_y / total_fz
+    # 拼接结果 [B, 2]
+    zmp_w = torch.cat([zmp_x, zmp_y], dim=1)
+    # --- 6. (可选) 特殊情况处理：完全腾空 ---
+    # 如果 total_fz 非常小（腾空），ZMP 计算无意义。
+    # 通常将其设置为机器人当前的水平位置，或者 mask 掉不参与 loss 计算。
+    # 这里简单处理：如果受力太小，就用此时机器人基座的 (x,y) 代替，避免数值爆炸。
+    is_flying = total_fz.squeeze(-1) < 2.0 * CONTACT_FORCE_THRESHOLD
+    if is_flying.any():
+        base_pos = env.scene["robot"].data.root_pos_w[:, :2]  # 获取基座位置
+        zmp_w[is_flying] = base_pos[is_flying]
+    return zmp_w
 
-    # 2. 接触掩码
-    mask = (forces_z > force_threshold).float()  # [B, 14]
+#########dcm##############################################
 
-    # 3. 接触状态
-    contact_l = (torch.sum(mask[:, :7], dim=1) > 1e-3)
-    contact_r = (torch.sum(mask[:, 7:], dim=1) > 1e-3)
+def dcm(env: ManagerBasedRlEnv, command_name: str) -> torch.Tensor:
+  command = cast(MotionCommand, env.command_manager.get_term(command_name))
+  sensor = env.scene["feet_contact"]
+  robot = env.scene["robot"]
+  device = env.device
+##################支撑域
+"""输入，接触点坐标shape (4096,0-12,2)  
+   输出，凸包
+"""
 
-    mask_double = (contact_l & contact_r).float()
-    mask_single_l = (contact_l & ~contact_r).float()
-    mask_single_r = (~contact_l & contact_r).float()
-    mask_none = (~contact_l & ~contact_r).float()
+def support_polygons(contact_points_batch, mask=None):
+    """
+    计算双足机器人支撑域（凸包）。
 
-    contact_state = mask_none*0 + mask_single_l*1 + mask_single_r*2 + mask_double*3
+    参数:
+        contact_points_batch: np.array, shape (Batch, Max_Points, 2)
+                              例如 (4096, 12, 2)。
+        mask: np.array, shape (Batch, Max_Points), 可选
+              布尔值，True表示该点是有效接触点。如果为None，
+              则假设所有非NaN/非无穷大的点都有效。
 
-    # 4. 总力/总力矩
-    total_fz = torch.sum(forces_z * mask, dim=1, keepdim=True) + 1e-6
-    total_torque_x = torch.sum(torque_x * mask, dim=1, keepdim=True)
-    total_torque_y = torch.sum(torque_y * mask, dim=1, keepdim=True)
+    返回:
+        polygons: list of np.array
+                  由凸包顶点组成的列表。每个元素的形状为 (N_vertices, 2)。
+                  注意：由于凸包顶点数不固定，无法返回规则Tensor。
+    """
+    batch_size = contact_points_batch.shape[0]
+    support_polygons = []
 
-    # 5. 力加权ZMP（仅力）
-    sum_mask = torch.sum(mask, dim=1, keepdim=True) + 1e-6
-    zmp_xy_force_only = torch.sum(pos_w * mask.unsqueeze(-1), dim=1) / sum_mask
+    for i in range(batch_size):
+        points = contact_points_batch[i]  # shape (12, 2)
 
-    # 6. 完整ZMP修正
-    zmp_x = zmp_xy_force_only[..., 0:1] - (total_torque_y / total_fz)
-    zmp_y = zmp_xy_force_only[..., 1:2] + (total_torque_x / total_fz)
-    zmp_xy_raw = torch.cat([zmp_x, zmp_y], dim=-1)
-
-    # 7. 脚中心
-    sum_mask_l = torch.sum(mask[:, :7], dim=1, keepdim=True) + 1e-6
-    foot_l_com = torch.sum(pos_w[:, :7] * mask[:, :7].unsqueeze(-1), dim=1) / sum_mask_l
-    sum_mask_r = torch.sum(mask[:, 7:], dim=1, keepdim=True) + 1e-6
-    foot_r_com = torch.sum(pos_w[:, 7:] * mask[:, 7:].unsqueeze(-1), dim=1) / sum_mask_r
-
-    robot_com = robot.root_pos[:, :2]
-
-    # 8. ZMP最终值按接触状态限制
-    zmp_xy = (
-        mask_none.unsqueeze(-1) * robot_com +
-        mask_single_l.unsqueeze(-1) * torch.clamp(zmp_xy_raw, foot_l_com - 0.05, foot_l_com + 0.05) +
-        mask_single_r.unsqueeze(-1) * torch.clamp(zmp_xy_raw, foot_r_com - 0.05, foot_r_com + 0.05) +
-        mask_double.unsqueeze(-1) * zmp_xy_raw
-    )
-
-    # 9. 支撑四边形 + 支撑中心 + ZMP到中心距离
-    support_quads = []
-    support_centers = []
-    zmp_inside = []
-    zmp_to_center_dist = []
-
-    for b in range(B):
-        points = pos_w[b][mask[b] > 0]  # [N,2]
-        if points.shape[0] > 0:
-            # 四边形顶点
-            min_xy = torch.min(points, dim=0).values
-            max_xy = torch.max(points, dim=0).values
-            quad = torch.stack([
-                min_xy,                                      # 左下
-                torch.tensor([min_xy[0], max_xy[1]], device=points.device),  # 左上
-                max_xy,                                      # 右上
-                torch.tensor([max_xy[0], min_xy[1]], device=points.device)   # 右下
-            ], dim=0)
-            support_quads.append(quad)
-
-            # 支撑中心
-            center = (min_xy + max_xy) / 2.0
-            support_centers.append(center)
-
-            # ZMP是否在四边形内
-            inside = ((zmp_xy[b,0] >= min_xy[0]) & (zmp_xy[b,0] <= max_xy[0]) &
-                      (zmp_xy[b,1] >= min_xy[1]) & (zmp_xy[b,1] <= max_xy[1]))
-            zmp_inside.append(inside.item())
-
-            # ZMP到支撑中心距离
-            dist = torch.norm(zmp_xy[b] - center, p=2)
-            zmp_to_center_dist.append(dist.item())
+        # 1. 数据清洗/筛选有效点
+        if mask is not None:
+            valid_points = points[mask[i] > 0]
         else:
-            support_quads.append(torch.zeros((4,2), device=pos_w.device))
-            support_centers.append(torch.zeros(2, device=pos_w.device))
-            zmp_inside.append(False)
-            zmp_to_center_dist.append(0.0)
+            # 示例：去除 NaN 或 极值，具体取决于你的数据预处理
+            # 这里假设不做过滤，或者假设数据已经清洗过
+            valid_points = points[~np.isnan(points).any(axis=1)]
 
-    return {
-        "zmp_xy": zmp_xy,                   # 最终ZMP
-        "contact_state": contact_state,     # 接触状态
-        "support_quad": support_quads,      # 四边形顶点
-        "support_center": support_centers,  # 支撑中心
-        "zmp_inside": zmp_inside,           # ZMP是否在支撑域
-        "zmp_to_center_dist": zmp_to_center_dist  # ZMP到中心距离，可作奖励
-    }
+        # 去重 (防止这就地打转)
+        valid_points = np.unique(valid_points, axis=0)
 
-import torch
+        num_points = valid_points.shape[0]
 
-# ---------------------------
-# 约束惩罚函数
-def compute_zmp_constraint_penalty(constraints, penalty_outside: float = 1.0):
-    """
-    计算ZMP约束惩罚
-    - ZMP在支撑域外时返回惩罚值 penalty_outside
-    - ZMP在支撑域内返回0
-    """
-    zmp_inside = constraints["zmp_inside"]
-    penalty = [0.0 if inside else penalty_outside for inside in zmp_inside]
-    return penalty
+        # 2. 计算凸包
+        # 情况 A: 点数不足以构成多边形 (0, 1, 2 个点)
+        if num_points < 3:
+            # 支撑域就是点本身或线段
+            support_polygons.append(valid_points)
+            continue
 
-# ---------------------------
-# 距离奖励函数
-def compute_zmp_distance_reward(constraints, max_dist: float = 0.1):
-    """
-    根据ZMP与支撑中心距离计算奖励
-    - 仅在ZMP在支撑域内时计算
-    - 越靠近中心奖励越高
-    - 距离超过max_dist奖励为0
-    """
-    zmp_xy = constraints["zmp_xy"]
-    support_center = constraints["support_center"]
-    zmp_inside = constraints["zmp_inside"]
+        # 情况 B: 3个及以上点，计算 ConvexHull
+        try:
+            hull = ConvexHull(valid_points)
+            # hull.vertices 包含顶点索引，我们需要按逆时针顺序排列的坐标
+            hull_points = valid_points[hull.vertices]
+            support_polygons.append(hull_points)
+        except QhullError:
+            # 极少数情况（如所有点共线），降级为直接返回点集
+            support_polygons.append(valid_points)
 
-    reward = []
-    for b in range(zmp_xy.shape[0]):
-        if zmp_inside[b]:
-            center = support_center[b]
-            dist = torch.norm(zmp_xy[b]-center, p=2).item()
-            r = max(0.0, 1.0 - dist/max_dist)
-            reward.append(r)
-        else:
-            reward.append(0.0)  # 不在支撑域，不给奖励
-    return reward
+    return support_polygons
 
 
+# --- 使用示例 ---
+# 模拟输入: 4096帧, 最大12个点, 2D坐标
+input_data = np.random.rand(4096, 12, 2)
 
+# 假设前6个点是左脚，后6个点是右脚，模拟随机接触
+# 这里生成一个随机mask作为演示
+input_mask = np.random.randint(0, 2, (4096, 12))
 
+results = compute_support_polygons(input_data, mask=input_mask)
 
-
-
+# 查看第一帧的支撑域顶点
+print(f"第一帧支撑域顶点数量: {len(results[0])}")
+print(results[0])
 
 
 

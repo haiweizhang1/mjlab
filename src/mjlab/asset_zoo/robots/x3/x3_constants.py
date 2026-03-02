@@ -75,7 +75,7 @@ X3_ACTUATOR_ARMS = BuiltinPositionActuatorCfg(
 )
 
 HOME_KEYFRAME = EntityCfg.InitialStateCfg(
-  pos=(0., 0., 0.93),
+  pos=(0., 0., 0.918),
   joint_pos={
     ".*_hip_pitch_joint": -0.3,
     ".*_knee_joint": 0.6,
@@ -89,7 +89,7 @@ HOME_KEYFRAME = EntityCfg.InitialStateCfg(
 )
 
 KNEES_BENT_KEYFRAME = EntityCfg.InitialStateCfg(
-  pos=(0., 0.,0.93 ),
+  pos=(0., 0.,0.918 ),
   joint_pos={
        ".*_hip_pitch_joint": -0.3,
             ".*_knee_joint": 0.6,

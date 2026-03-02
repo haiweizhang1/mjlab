@@ -57,7 +57,7 @@ class _OnnxMotionPolicyExporter(_OnnxPolicyExporter):
 
   def export(self, path, filename):
     self.to("cpu")
-    obs = torch.zeros(1, self.actor[0].in_features)
+    obs = torch.zeros(1, self.actor.backbone[0].in_features)
     time_step = torch.zeros(1, 1)
     torch.onnx.export(
       self,

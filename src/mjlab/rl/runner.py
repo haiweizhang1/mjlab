@@ -1,4 +1,4 @@
-from rsl_rl.runners import OnPolicyRunner
+from mjlab.rl.rsl_rl.runners import OnPolicyRunner
 
 from mjlab.rl.vecenv_wrapper import RslRlVecEnvWrapper
 

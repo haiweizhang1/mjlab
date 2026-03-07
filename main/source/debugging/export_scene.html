@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Distributed Training &#8212; mjlab Documentation</title>
+    <title>Export Scene &#8212; mjlab Documentation</title>
   
   
   
@@ -51,12 +51,12 @@
     <script src="../../_static/copybutton.js?v=f281be69"></script>
     <script src="../../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
     <script src="../../_static/design-tabs.js?v=f930bc37"></script>
-    <script>DOCUMENTATION_OPTIONS.pagename = 'source/training/distributed_training';</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'source/debugging/export_scene';</script>
     <link rel="icon" href="../../_static/favicon.ico"/>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="Cloud Training" href="cloud.html" />
-    <link rel="prev" title="Viewers" href="../viewers.html" />
+    <link rel="next" title="API Reference" href="../api/index.html" />
+    <link rel="prev" title="NaN Guard" href="nan_guard.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
     <meta name="docbuild:last-update" content="Mar 07, 2026"/>
@@ -169,7 +169,7 @@
 <div class="sidebar-version-switcher">
   <label class="sidebar-version-label" for="version-select">Version</label>
   <select id="version-select" class="sidebar-version-select" onchange="location = this.value;">
-    <option value="distributed_training.html" selected>main</option>
+    <option value="export_scene.html" selected>main</option>
   </select>
 </div>
 </div>
@@ -212,12 +212,12 @@
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Training &amp; Debugging</span></p>
 <ul class="current nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="rsl_rl.html">Training with RSL-RL</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../training/rsl_rl.html">Training with RSL-RL</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../viewers.html">Viewers</a></li>
-<li class="toctree-l1 current active"><a class="current reference internal" href="#">Distributed Training</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cloud.html">Cloud Training</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../debugging/nan_guard.html">NaN Guard</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../debugging/export_scene.html">Export Scene</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../training/distributed_training.html">Distributed Training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../training/cloud.html">Cloud Training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="nan_guard.html">NaN Guard</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Export Scene</a></li>
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul class="nav bd-sidenav">
@@ -314,7 +314,7 @@
       
       
       
-      <li><a href="https://github.com/mujocolab/mjlab/edit/main/docs/source/training/distributed_training.rst" target="_blank"
+      <li><a href="https://github.com/mujocolab/mjlab/edit/main/docs/source/debugging/export_scene.rst" target="_blank"
    class="btn btn-sm btn-source-edit-button dropdown-item"
    title="Suggest edit"
    data-bs-placement="left" data-bs-toggle="tooltip"
@@ -331,7 +331,7 @@
       
       
       
-      <li><a href="https://github.com/mujocolab/mjlab/issues/new?title=Issue%20on%20page%20%2Fsource/training/distributed_training.html&body=Your%20issue%20content%20here." target="_blank"
+      <li><a href="https://github.com/mujocolab/mjlab/issues/new?title=Issue%20on%20page%20%2Fsource/debugging/export_scene.html&body=Your%20issue%20content%20here." target="_blank"
    class="btn btn-sm btn-source-issues-button dropdown-item"
    title="Open an issue"
    data-bs-placement="left" data-bs-toggle="tooltip"
@@ -361,7 +361,7 @@
       
       
       
-      <li><a href="../../_sources/source/training/distributed_training.rst" target="_blank"
+      <li><a href="../../_sources/source/debugging/export_scene.rst" target="_blank"
    class="btn btn-sm btn-download-source-button dropdown-item"
    title="Download source file"
    data-bs-placement="left" data-bs-toggle="tooltip"
@@ -445,7 +445,7 @@ document.write(`
               
 
 <div id="jb-print-docs-body" class="onlyprint">
-    <h1>Distributed Training</h1>
+    <h1>Export Scene</h1>
     <!-- Table of contents -->
     <div id="print-main-content">
         <div id="jb-print-toc">
@@ -455,10 +455,9 @@ document.write(`
             </div>
             <nav aria-label="Page">
                 <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#usage">Usage</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#scaling-behavior">Scaling behavior</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#how-it-works">How it works</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#logging">Logging</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quick-start">Quick start</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#target-resolution">Target resolution</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#options">Options</a></li>
 </ul>
             </nav>
         </div>
@@ -470,97 +469,49 @@ document.write(`
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section id="distributed-training">
-<span id="id1"></span><h1>Distributed Training<a class="headerlink" href="#distributed-training" title="Link to this heading">#</a></h1>
-<p>mjlab supports multi-GPU distributed training using
-<a class="reference external" href="https://github.com/apoorvkh/torchrunx">torchrunx</a>. Each GPU runs
-independent rollouts with its own environments, and gradients are
-synchronized during policy updates. Throughput scales nearly linearly with
-GPU count.</p>
-<section id="usage">
-<h2>Usage<a class="headerlink" href="#usage" title="Link to this heading">#</a></h2>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Single GPU (default).</span>
-uv<span class="w"> </span>run<span class="w"> </span>train<span class="w"> </span>&lt;task-name&gt;<span class="w"> </span>--gpu-ids<span class="w"> </span><span class="s2">&quot;[0]&quot;</span>
+  <section id="export-scene">
+<span id="id1"></span><h1>Export Scene<a class="headerlink" href="#export-scene" title="Link to this heading">#</a></h1>
+<p>The <code class="docutils literal notranslate"><span class="pre">export-scene</span></code> script writes a complete scene (XML and mesh assets) to a
+directory for inspection, sharing, or loading in standalone MuJoCo.</p>
+<section id="quick-start">
+<h2>Quick start<a class="headerlink" href="#quick-start" title="Link to this heading">#</a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Export a built-in entity by alias.</span>
+uv<span class="w"> </span>run<span class="w"> </span>export-scene<span class="w"> </span>g1<span class="w"> </span>--output-dir<span class="w"> </span>/tmp/g1
 
-<span class="c1"># Two GPUs.</span>
-uv<span class="w"> </span>run<span class="w"> </span>train<span class="w"> </span>&lt;task-name&gt;<span class="w"> </span>--gpu-ids<span class="w"> </span><span class="s2">&quot;[0, 1]&quot;</span>
+<span class="c1"># Export a registered task scene.</span>
+uv<span class="w"> </span>run<span class="w"> </span>export-scene<span class="w"> </span>Mjlab-Velocity-Flat-Unitree-Go1<span class="w"> </span>--output-dir<span class="w"> </span>/tmp/task
 
-<span class="c1"># All available GPUs.</span>
-uv<span class="w"> </span>run<span class="w"> </span>train<span class="w"> </span>&lt;task-name&gt;<span class="w"> </span>--gpu-ids<span class="w"> </span>all
+<span class="c1"># Export as a zip archive.</span>
+uv<span class="w"> </span>run<span class="w"> </span>export-scene<span class="w"> </span>yam<span class="w"> </span>--output-dir<span class="w"> </span>/tmp/yam<span class="w"> </span>--zip<span class="w"> </span>True
 
-<span class="c1"># CPU mode.</span>
-uv<span class="w"> </span>run<span class="w"> </span>train<span class="w"> </span>&lt;task-name&gt;<span class="w"> </span>--gpu-ids<span class="w"> </span>None
+<span class="c1"># Export a custom entity via import path.</span>
+uv<span class="w"> </span>run<span class="w"> </span>export-scene<span class="w"> </span>my_pkg.robots:get_my_robot_cfg<span class="w"> </span>--output-dir<span class="w"> </span>/tmp/custom
 </pre></div>
 </div>
-<p>Key points:</p>
-<ul class="simple">
-<li><p>GPU indices are relative to <code class="docutils literal notranslate"><span class="pre">CUDA_VISIBLE_DEVICES</span></code> if set. For example,
-<code class="docutils literal notranslate"><span class="pre">CUDA_VISIBLE_DEVICES=2,3</span> <span class="pre">uv</span> <span class="pre">run</span> <span class="pre">train</span> <span class="pre">...</span> <span class="pre">--gpu-ids</span> <span class="pre">&quot;[0,</span> <span class="pre">1]&quot;</span></code> uses physical
-GPUs 2 and 3.</p></li>
-<li><p>Single-GPU and CPU modes run directly without torchrunx.</p></li>
-</ul>
+<p>The output directory contains a <code class="docutils literal notranslate"><span class="pre">scene.xml</span></code> and an <code class="docutils literal notranslate"><span class="pre">assets/</span></code> subdirectory
+with all referenced mesh files. The XML can be loaded directly with
+<code class="docutils literal notranslate"><span class="pre">mujoco.MjModel.from_xml_path()</span></code> or dropped into the
+<a class="reference external" href="https://mujoco.readthedocs.io/en/stable/programming/samples.html#sasimulate">simulate viewer</a>.</p>
 </section>
-<section id="scaling-behavior">
-<h2>Scaling behavior<a class="headerlink" href="#scaling-behavior" title="Link to this heading">#</a></h2>
-<p>Multi-GPU training is <strong>data-parallel, not work-splitting</strong>. Each GPU runs
-the full <code class="docutils literal notranslate"><span class="pre">num-envs</span></code> count independently, so the total experience collected
-per iteration is:</p>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>experience per iteration = num_envs x num_steps_per_env x num_gpus
-</pre></div>
-</div>
-<p>Iteration speed stays roughly the same because each GPU does the same amount
-of work. The benefit is that each policy update sees more diverse experience,
-so the policy converges faster in wall-clock time.</p>
-<div class="admonition important">
-<p class="admonition-title">Important</p>
-<p>Because <code class="docutils literal notranslate"><span class="pre">max-iterations</span></code> is not automatically adjusted, training with
-more GPUs runs for proportionally longer. If you want the same total
-training time, scale <code class="docutils literal notranslate"><span class="pre">max-iterations</span></code> down by the number of GPUs
-(e.g., halve it when doubling from 1 to 2 GPUs).</p>
-</div>
-</section>
-<section id="how-it-works">
-<h2>How it works<a class="headerlink" href="#how-it-works" title="Link to this heading">#</a></h2>
-<p>mjlab’s role is to <strong>isolate MuJoCo Warp simulations on each GPU</strong> using
-<code class="docutils literal notranslate"><span class="pre">wp.ScopedDevice</span></code>. torchrunx handles the rest.</p>
-<p><strong>Process spawning.</strong> <code class="docutils literal notranslate"><span class="pre">torchrunx.Launcher</span></code> spawns one process per GPU and
-sets <code class="docutils literal notranslate"><span class="pre">RANK</span></code>, <code class="docutils literal notranslate"><span class="pre">LOCAL_RANK</span></code>, and <code class="docutils literal notranslate"><span class="pre">WORLD_SIZE</span></code> to coordinate them. Each
-process executes the training function with its assigned GPU.</p>
-<p><strong>Independent rollouts.</strong> Each process maintains its own:</p>
-<ul class="simple">
-<li><p>Environment instances (with <code class="docutils literal notranslate"><span class="pre">num-envs</span></code> parallel environments), isolated
-on its assigned GPU via <code class="docutils literal notranslate"><span class="pre">wp.ScopedDevice</span></code></p></li>
-<li><p>Policy network copy</p></li>
-<li><p>Experience buffer (sized <code class="docutils literal notranslate"><span class="pre">num_steps_per_env</span> <span class="pre">*</span> <span class="pre">num_envs</span></code>)</p></li>
-</ul>
-<p>Each process uses <code class="docutils literal notranslate"><span class="pre">seed</span> <span class="pre">=</span> <span class="pre">cfg.seed</span> <span class="pre">+</span> <span class="pre">local_rank</span></code> to ensure different
-random experiences across GPUs, increasing sample diversity.</p>
-<p><strong>Gradient synchronization.</strong> During the update phase, RSL-RL synchronizes
-gradients after each mini-batch through its <code class="docutils literal notranslate"><span class="pre">reduce_parameters()</span></code> method:</p>
+<section id="target-resolution">
+<h2>Target resolution<a class="headerlink" href="#target-resolution" title="Link to this heading">#</a></h2>
+<p>The positional <code class="docutils literal notranslate"><span class="pre">target</span></code> argument is resolved in order:</p>
 <ol class="arabic simple">
-<li><p>Each process computes gradients independently on its local mini-batch</p></li>
-<li><p>All policy gradients are flattened into a single tensor</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">torch.distributed.all_reduce</span></code> averages gradients across all GPUs</p></li>
-<li><p>Averaged gradients are copied back to each parameter, keeping policies
-synchronized</p></li>
+<li><p><strong>Task ID</strong>: checked against the task registry (<code class="docutils literal notranslate"><span class="pre">import</span> <span class="pre">mjlab.tasks</span></code>).</p></li>
+<li><p><strong>Entity alias</strong>: one of the built-in shorthands (<code class="docutils literal notranslate"><span class="pre">g1</span></code>, <code class="docutils literal notranslate"><span class="pre">go1</span></code>, <code class="docutils literal notranslate"><span class="pre">yam</span></code>).</p></li>
+<li><p><strong>Import path</strong>: a <code class="docutils literal notranslate"><span class="pre">module:attribute</span></code> string pointing to any callable
+that returns an <code class="docutils literal notranslate"><span class="pre">EntityCfg</span></code>.</p></li>
 </ol>
-<p><strong>Single-writer I/O.</strong> Only rank 0 writes config files, videos, and W&amp;B
-logs to avoid race conditions.</p>
+<p>If none match, the script prints available task IDs and aliases.</p>
 </section>
-<section id="logging">
-<h2>Logging<a class="headerlink" href="#logging" title="Link to this heading">#</a></h2>
-<p>By default, torchrunx process logs are saved to <code class="docutils literal notranslate"><span class="pre">{log_dir}/torchrunx/</span></code>.
-This can be customized:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Disable torchrunx file logging.</span>
-uv<span class="w"> </span>run<span class="w"> </span>train<span class="w"> </span>&lt;task-name&gt;<span class="w"> </span>--gpu-ids<span class="w"> </span><span class="s2">&quot;[0, 1]&quot;</span><span class="w"> </span>--torchrunx-log-dir<span class="w"> </span><span class="s2">&quot;&quot;</span>
-
-<span class="c1"># Custom log directory.</span>
-uv<span class="w"> </span>run<span class="w"> </span>train<span class="w"> </span>&lt;task-name&gt;<span class="w"> </span>--gpu-ids<span class="w"> </span><span class="s2">&quot;[0, 1]&quot;</span><span class="w"> </span>--torchrunx-log-dir<span class="w"> </span>/path/to/logs
-
-<span class="c1"># Environment variable (takes precedence over the flag).</span>
-<span class="nv">TORCHRUNX_LOG_DIR</span><span class="o">=</span>/tmp/logs<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>train<span class="w"> </span>&lt;task-name&gt;<span class="w"> </span>--gpu-ids<span class="w"> </span><span class="s2">&quot;[0, 1]&quot;</span>
-</pre></div>
-</div>
+<section id="options">
+<h2>Options<a class="headerlink" href="#options" title="Link to this heading">#</a></h2>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">--output-dir</span> <span class="pre">DIR</span></code> <em>(default: “export”)</em></dt><dd><p>Destination directory. Cleaned before each export to prevent stale assets.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--zip</span> <span class="pre">True</span></code> <em>(default: False)</em></dt><dd><p>Compress the output into a <code class="docutils literal notranslate"><span class="pre">.zip</span></code> archive and remove the directory.</p>
+</dd>
+</dl>
 </section>
 </section>
 
@@ -576,20 +527,20 @@ uv<span class="w"> </span>run<span class="w"> </span>train<span class="w"> </spa
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="../viewers.html"
+       href="nan_guard.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">Viewers</p>
+        <p class="prev-next-title">NaN Guard</p>
       </div>
     </a>
     <a class="right-next"
-       href="cloud.html"
+       href="../api/index.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">Cloud Training</p>
+        <p class="prev-next-title">API Reference</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -609,10 +560,9 @@ uv<span class="w"> </span>run<span class="w"> </span>train<span class="w"> </spa
   </div>
   <nav class="bd-toc-nav page-toc">
     <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#usage">Usage</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#scaling-behavior">Scaling behavior</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#how-it-works">How it works</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#logging">Logging</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quick-start">Quick start</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#target-resolution">Target resolution</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#options">Options</a></li>
 </ul>
   </nav></div>
 

@@ -5,6 +5,16 @@ Changelog
 Upcoming version (not yet released)
 -----------------------------------
 
+Fixed
+^^^^^
+
+- Set terrain geom mass to zero so that the static terrain body does not
+  inflate ``stat.meanmass``, which made force arrow visualization invisible
+  on rough terrain (:issue:`734`, :issue:`537`).
+
+Version 1.2.0 (March 6, 2026)
+-----------------------------
+
 .. admonition:: Breaking API changes
    :class: attention
 
@@ -13,10 +23,21 @@ Upcoming version (not yet released)
    - ``EventTermCfg`` no longer accepts ``domain_randomization``. The
      ``@requires_model_fields`` decorator on each ``dr`` function takes care
      of field expansion automatically.
+   - ``Scene.to_zip()`` is deprecated. Use ``Scene.write(path, zip=True)``.
+   - ``RslRlModelCfg`` no longer accepts ``stochastic``, ``init_noise_std``,
+     or ``noise_std_type``. Use ``distribution_cfg`` instead
+     (e.g. ``{"class_name": "GaussianDistribution", "init_std": 1.0,
+     "std_type": "scalar"}``). Existing checkpoints are automatically
+     migrated on load.
 
 Added
 ^^^^^
 
+- Added ``"step"`` event mode that fires every environment step.
+- Added ``apply_body_impulse`` event for applying transient external wrenches
+  to bodies with configurable duration and optional application point offset.
+- ONNX auto-export and metadata attachment for manipulation tasks (lift cube)
+  on every checkpoint save, matching the velocity and tracking task behavior.
 - Cloud training support via `SkyPilot <https://skypilot.readthedocs.io/>`_
   and Lambda Cloud, with documentation covering setup, monitoring, and
   cost management.
@@ -26,6 +47,9 @@ Added
   (``/update-mjwarp``, ``/commit-push-pr``).
 - Added optional ``ViewerConfig.fovy`` and apply it in native viewer camera
   setup when provided.
+- Native viewer now tracks the first non-fixed body by default (matching
+  the Viser viewer behavior introduced in
+  ``716aaaa58ad7bfaf34d2f771549d461204d1b4ba``).
 - New ``dr`` module (``mjlab.envs.mdp.dr``) replacing ``randomize_field``
   with typed per-field domain randomization functions. Each function
   automatically recomputes derived fields via ``set_const``. Highlights:
@@ -55,6 +79,10 @@ Added
     (``material_names``).
   - Fixed ``dr.effort_limits`` drifting on repeated randomization.
   - Fixed ``dr.body_com_offset`` not triggering ``set_const``.
+
+- ``export-scene`` CLI script to export any task scene or asset_zoo entity
+  (``g1``, ``go1``, ``yam``) to a directory or zip archive for inspection
+  and debugging.
 
 - ``yam_lift_cube_vision_env_cfg`` now randomizes cube color (``dr.geom_rgba``)
   on every reset when ``cam_type="rgb"``.
@@ -107,10 +135,29 @@ Added
 - Added ``upload_model`` option to ``RslRlBaseRunnerCfg`` to control W&B model
   file uploads (``.pt`` and ``.onnx``) while keeping metric logging enabled
   (`#654 <https://github.com/mujocolab/mjlab/pull/654>`_).
+- ``Scene.write(output_dir, zip=False)`` exports the scene XML and mesh
+  assets to a directory (or zip archive). Replaces ``Scene.to_zip()``.
+- ``Entity.write_xml()`` and ``Scene.write()`` now apply XML fixups
+  (empty defaults, duplicate nested defaults) and strip buffer textures
+  that ``MjSpec.to_xml()`` cannot serialize.
+- ``fix_spec_xml`` and ``strip_buffer_textures`` utilities in
+  ``mjlab.utils.xml``.
 
 Changed
 ^^^^^^^
 
+- Native viewer now syncs ``xfrc_applied`` to the render buffer and draws
+  arrows for any nonzero applied forces. Mouse perturbation forces are
+  converted to ``qfrc_applied`` (generalized joint space) so they coexist
+  with programmatic forces on ``xfrc_applied`` without conflict.
+- ``ViewerConfig.OriginType.WORLD`` now configures a free camera at the
+  specified lookat point instead of auto tracking a body. A new ``AUTO``
+  origin type (now the default) preserves the previous auto tracking
+  behavior.
+- Upgraded ``rsl-rl-lib`` from 4.0.1 to 5.0.1. ``RslRlModelCfg`` now
+  uses ``distribution_cfg`` dict instead of ``stochastic`` /
+  ``init_noise_std`` / ``noise_std_type``. Existing checkpoints are
+  automatically migrated on load.
 - Reorganized the Viser Controls tab into a cleaner folder hierarchy:
   Info, Simulation, Commands, Scene (with Environment, Camera, Debug Viz,
   Contacts sub-folders), and Camera Feeds. The Environment folder is

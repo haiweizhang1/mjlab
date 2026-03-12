@@ -56,7 +56,7 @@
     <link rel="search" title="Search" href="search.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-    <meta name="docbuild:last-update" content="Mar 07, 2026"/>
+    <meta name="docbuild:last-update" content="Mar 12, 2026"/>
   </head>
   
   
@@ -211,7 +211,10 @@
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Training &amp; Debugging</span></p>
 <ul class="nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="source/training/rsl_rl.html">Training with RSL-RL</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="source/training/rsl_rl.html">Training with RSL-RL</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="source/training/motion_imitation.html">Motion Imitation</a></li>
+</ul>
+</details></li>
 <li class="toctree-l1"><a class="reference internal" href="source/viewers.html">Viewers</a></li>
 <li class="toctree-l1"><a class="reference internal" href="source/training/distributed_training.html">Distributed Training</a></li>
 <li class="toctree-l1"><a class="reference internal" href="source/training/cloud.html">Cloud Training</a></li>
@@ -830,6 +833,8 @@ document.write(`
       </ul></li>
       <li><a href="source/api/sim.html#mjlab.sim.WarpBridge.clear_cache">clear_cache() (mjlab.sim.WarpBridge method)</a>
 </li>
+      <li><a href="source/api/entity.html#mjlab.entity.Entity.clear_state">clear_state() (mjlab.entity.Entity method)</a>
+</li>
       <li><a href="source/api/managers.html#mjlab.managers.ActionTermCfg.clip">clip (mjlab.managers.ActionTermCfg attribute)</a>
 
       <ul>
@@ -1294,8 +1299,6 @@ document.write(`
         <li><a href="source/api/actuator.html#mjlab.actuator.BuiltinMuscleActuatorCfg.gear">(mjlab.actuator.BuiltinMuscleActuatorCfg attribute)</a>
 </li>
       </ul></li>
-      <li><a href="source/api/entity.html#mjlab.entity.EntityData.generalized_force">generalized_force (mjlab.entity.EntityData property)</a>
-</li>
       <li><a href="source/api/sensor.html#mjlab.sensor.GridPatternCfg.generate_rays">generate_rays() (mjlab.sensor.GridPatternCfg method)</a>
 
       <ul>
@@ -1454,6 +1457,8 @@ document.write(`
         <li><a href="source/api/actuator.html#mjlab.actuator.IdealPdActuator.initialize">(mjlab.actuator.IdealPdActuator method)</a>
 </li>
         <li><a href="source/api/actuator.html#mjlab.actuator.LearnedMlpActuator.initialize">(mjlab.actuator.LearnedMlpActuator method)</a>
+</li>
+        <li><a href="source/api/entity.html#mjlab.entity.Entity.initialize">(mjlab.entity.Entity method)</a>
 </li>
         <li><a href="source/api/sensor.html#mjlab.sensor.BuiltinSensor.initialize">(mjlab.sensor.BuiltinSensor method)</a>
 </li>
@@ -1992,10 +1997,14 @@ document.write(`
 <h2 id="Q">Q</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="source/api/sensor.html#mjlab.sensor.CameraSensorCfg.quat">quat (mjlab.sensor.CameraSensorCfg attribute)</a>
+      <li><a href="source/api/entity.html#mjlab.entity.EntityData.qfrc_actuator">qfrc_actuator (mjlab.entity.EntityData property)</a>
+</li>
+      <li><a href="source/api/entity.html#mjlab.entity.EntityData.qfrc_external">qfrc_external (mjlab.entity.EntityData property)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="source/api/sensor.html#mjlab.sensor.CameraSensorCfg.quat">quat (mjlab.sensor.CameraSensorCfg attribute)</a>
+</li>
       <li><a href="source/api/sensor.html#mjlab.sensor.RayCastData.quat_w">quat_w (mjlab.sensor.RayCastData attribute)</a>
 </li>
   </ul></td>
@@ -2046,6 +2055,8 @@ document.write(`
         <li><a href="source/api/actuator.html#mjlab.actuator.DelayedActuator.reset">(mjlab.actuator.DelayedActuator method)</a>
 </li>
         <li><a href="source/api/actuator.html#mjlab.actuator.LearnedMlpActuator.reset">(mjlab.actuator.LearnedMlpActuator method)</a>
+</li>
+        <li><a href="source/api/entity.html#mjlab.entity.Entity.reset">(mjlab.entity.Entity method)</a>
 </li>
         <li><a href="source/api/managers.html#mjlab.managers.ActionManager.reset">(mjlab.managers.ActionManager method)</a>
 </li>
@@ -2459,6 +2470,8 @@ document.write(`
       <ul>
         <li><a href="source/api/actuator.html#mjlab.actuator.DelayedActuator.update">(mjlab.actuator.DelayedActuator method)</a>
 </li>
+        <li><a href="source/api/entity.html#mjlab.entity.Entity.update">(mjlab.entity.Entity method)</a>
+</li>
         <li><a href="source/api/sensor.html#mjlab.sensor.ContactSensor.update">(mjlab.sensor.ContactSensor method)</a>
 </li>
         <li><a href="source/api/sensor.html#mjlab.sensor.Sensor.update">(mjlab.sensor.Sensor method)</a>
@@ -2554,6 +2567,8 @@ document.write(`
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="source/api/entity.html#mjlab.entity.Entity.write_data_to_sim">write_data_to_sim() (mjlab.entity.Entity method)</a>
+</li>
       <li><a href="source/api/entity.html#mjlab.entity.Entity.write_external_wrench_to_sim">write_external_wrench_to_sim() (mjlab.entity.Entity method)</a>
 </li>
       <li><a href="source/api/entity.html#mjlab.entity.Entity.write_joint_position_to_sim">write_joint_position_to_sim() (mjlab.entity.Entity method)</a>
@@ -2666,7 +2681,7 @@ By The mjlab Developers
   
   <div class="footer-item">
     <p class="last-updated">
-  Last updated on Mar 07, 2026.
+  Last updated on Mar 12, 2026.
   <br/>
 </p>
   </div>

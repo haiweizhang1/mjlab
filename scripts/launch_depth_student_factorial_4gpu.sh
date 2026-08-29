@@ -4,6 +4,7 @@ set -euo pipefail
 repo_dir="${MJLAB_SOCCER_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
 runner="$repo_dir/scripts/run_depth_student_frozen_factorial_seed42.sh"
 num_envs="${NUM_ENVS:-4096}"
+max_iterations="${MAX_ITERATIONS:-30000}"
 gpu_ids_raw="${GPU_IDS:-0 1 2 3}"
 read -r -a gpu_ids <<< "$gpu_ids_raw"
 variants=(e1 e2 e3 e4)
@@ -36,9 +37,9 @@ for index in "${!variants[@]}"; do
   log_file="$launch_log_dir/$variant.log"
   tmux new-session -d -s "$session" -c "$repo_dir"
   tmux send-keys -t "$session" \
-    "CUDA_VISIBLE_DEVICES='$gpu' NUM_ENVS='$num_envs' bash '$runner' '$variant' 2>&1 | tee '$log_file'" \
+    "CUDA_VISIBLE_DEVICES='$gpu' NUM_ENVS='$num_envs' MAX_ITERATIONS='$max_iterations' bash '$runner' '$variant' 2>&1 | tee '$log_file'" \
     C-m
-  echo "Started $variant in tmux session $session on GPU $gpu ($num_envs envs); log: $log_file"
+  echo "Started $variant in tmux session $session on GPU $gpu ($num_envs envs, $max_iterations iterations); log: $log_file"
 done
 
 echo "Use 'tmux ls' to list jobs and 'tmux attach -t depth_e1' to inspect one."

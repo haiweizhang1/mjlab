@@ -10,23 +10,24 @@ variant="$1"
 repo_dir="${MJLAB_SOCCER_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
 teacher_checkpoint="$repo_dir/checkpoints/football_2026-08-29/teacher_klavier_model_47000.pt"
 train_entrypoint="$repo_dir/.venv/bin/train"
+max_iterations="${MAX_ITERATIONS:-30000}"
 
 case "$variant" in
   e1)
     task_id="Mjlab-Velocity-Football-Depth-KlavierTeacher-PushCurrOff-FrozenMLP-NoSym-LatentDistillation-Flat-Unitree-G1"
-    run_name="E1_PushCurrOff_FrozenMLP_NoSym_Teacher47000_seed42_10k_wandb"
+    run_name="E1_PushCurrOff_FrozenMLP_NoSym_Teacher47000_seed42_${max_iterations}iter_wandb"
     ;;
   e2)
     task_id="Mjlab-Velocity-Football-Depth-KlavierTeacher-PushCurrOff-FrozenMLP-Sym-LatentDistillation-Flat-Unitree-G1"
-    run_name="E2_PushCurrOff_FrozenMLP_Sym1_Teacher47000_seed42_10k_wandb"
+    run_name="E2_PushCurrOff_FrozenMLP_Sym1_Teacher47000_seed42_${max_iterations}iter_wandb"
     ;;
   e3)
     task_id="Mjlab-Velocity-Football-Depth-KlavierTeacher-PushCurrOn-FrozenMLP-NoSym-LatentDistillation-Flat-Unitree-G1"
-    run_name="E3_PushCurrOn_FrozenMLP_NoSym_Teacher47000_seed42_10k_wandb"
+    run_name="E3_PushCurrOn_FrozenMLP_NoSym_Teacher47000_seed42_${max_iterations}iter_wandb"
     ;;
   e4)
     task_id="Mjlab-Velocity-Football-Depth-KlavierTeacher-PushCurrOn-FrozenMLP-Sym-LatentDistillation-Flat-Unitree-G1"
-    run_name="E4_PushCurrOn_FrozenMLP_Sym1_Teacher47000_seed42_10k_wandb"
+    run_name="E4_PushCurrOn_FrozenMLP_Sym1_Teacher47000_seed42_${max_iterations}iter_wandb"
     ;;
   *)
     echo "ERROR: unknown variant '$variant'; expected e1, e2, e3, or e4" >&2
@@ -61,7 +62,7 @@ exec "$train_entrypoint" \
   --agent.seed 42 \
   --agent.algorithm.rollout-policy teacher \
   --agent.algorithm.latent-loss-coef 0.1 \
-  --agent.max-iterations 10000 \
+  --agent.max-iterations "$max_iterations" \
   --agent.save-interval 500 \
   --agent.logger wandb \
   --agent.wandb-project mjlab \

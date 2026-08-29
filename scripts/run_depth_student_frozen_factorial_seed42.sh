@@ -9,6 +9,7 @@ fi
 variant="$1"
 repo_dir="${MJLAB_SOCCER_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
 teacher_checkpoint="$repo_dir/checkpoints/football_2026-08-29/teacher_klavier_model_47000.pt"
+train_entrypoint="$repo_dir/.venv/bin/train"
 
 case "$variant" in
   e1)
@@ -37,6 +38,11 @@ if [[ ! -f "$teacher_checkpoint" ]]; then
   echo "ERROR: missing Teacher checkpoint: $teacher_checkpoint" >&2
   exit 1
 fi
+if [[ ! -x "$train_entrypoint" ]]; then
+  echo "ERROR: missing project train entrypoint: $train_entrypoint" >&2
+  echo "Run 'uv sync --locked' in $repo_dir first." >&2
+  exit 1
+fi
 
 num_envs="${NUM_ENVS:-4096}"
 cd "$repo_dir"
@@ -48,7 +54,7 @@ export PYTORCH_ALLOC_CONF=expandable_segments:True
 export MUJOCO_GL="${MUJOCO_GL:-egl}"
 export PYOPENGL_PLATFORM="${PYOPENGL_PLATFORM:-egl}"
 
-exec uv run train \
+exec "$train_entrypoint" \
   "$task_id" \
   --pretrained-checkpoint "$teacher_checkpoint" \
   --env.scene.num-envs "$num_envs" \

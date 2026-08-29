@@ -3,7 +3,7 @@ set -euo pipefail
 
 repo_dir="${MJLAB_SOCCER_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
 runner="$repo_dir/scripts/run_depth_student_frozen_factorial_seed42.sh"
-num_envs="${NUM_ENVS:-2048}"
+num_envs="${NUM_ENVS:-4096}"
 gpu_ids_raw="${GPU_IDS:-0 1 2 3}"
 read -r -a gpu_ids <<< "$gpu_ids_raw"
 variants=(e1 e2 e3 e4)

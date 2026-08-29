@@ -40,7 +40,7 @@ fi
 
 num_envs="${NUM_ENVS:-4096}"
 cd "$repo_dir"
-export UV_CACHE_DIR="/tmp/mjlab-uv-cache-$variant"
+export UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/mjlab-uv-cache}"
 export WARP_CACHE_PATH="/tmp/mjlab-warp-$variant"
 export MPLCONFIGDIR="/tmp/mjlab-mpl-$variant"
 export XDG_CACHE_HOME="/tmp/mjlab-xdg-$variant"

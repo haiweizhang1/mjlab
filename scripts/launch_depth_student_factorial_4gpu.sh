@@ -7,6 +7,7 @@ num_envs="${NUM_ENVS:-4096}"
 gpu_ids_raw="${GPU_IDS:-0 1 2 3}"
 read -r -a gpu_ids <<< "$gpu_ids_raw"
 variants=(e1 e2 e3 e4)
+export UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/mjlab-uv-cache}"
 
 if ! command -v tmux >/dev/null 2>&1; then
   echo "ERROR: tmux is required for the four-job launcher" >&2
@@ -16,6 +17,10 @@ if [[ ${#gpu_ids[@]} -ne 4 ]]; then
   echo "ERROR: GPU_IDS must contain exactly four GPU indices" >&2
   exit 2
 fi
+
+echo "Preparing the shared uv environment once before launching four jobs..."
+cd "$repo_dir"
+uv sync --locked
 
 for index in "${!variants[@]}"; do
   variant="${variants[$index]}"

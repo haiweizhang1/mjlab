@@ -63,7 +63,7 @@ exec "$train_entrypoint" \
   --agent.algorithm.rollout-policy teacher \
   --agent.algorithm.latent-loss-coef 0.1 \
   --agent.max-iterations "$max_iterations" \
-  --agent.save-interval 500 \
+  --agent.save-interval 1000 \
   --agent.logger wandb \
   --agent.wandb-project mjlab \
   --agent.upload-model False \

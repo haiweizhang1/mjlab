@@ -14,6 +14,7 @@ from mjlab.sensor import CameraSensorCfg
 from mjlab.tasks.velocity_football.config.g1.env_cfgs import (
   unitree_g1_flat_env_cfg,
   unitree_g1_isaaclab_aligned_flat_env_cfg,
+  unitree_g1_klavier_ball_temporal_flat_env_cfg,
   unitree_g1_long_dropout10_envelope30_legacy_curriculum_flat_env_cfg,
 )
 from mjlab.tasks.velocity_football.mdp.observations import ball_pos_b
@@ -24,6 +25,7 @@ from .events import (
 )
 from .observations import (
   ball_auxiliary_target,
+  ball_visibility_from_camera_segmentation,
   normalized_camera_depth,
   normalized_camera_depth_frame,
 )
@@ -319,9 +321,7 @@ def unitree_g1_depth_temporal_long_dropout10_camera_dr_flat_env_cfg(
       term.params["transition_excluded_standing_command_name"] = "twist"
 
     depth_camera = next(
-      sensor
-      for sensor in cfg.scene.sensors or ()
-      if sensor.name == DEPTH_SENSOR_NAME
+      sensor for sensor in cfg.scene.sensors or () if sensor.name == DEPTH_SENSOR_NAME
     )
     assert isinstance(depth_camera, CameraSensorCfg)
     depth_camera.data_types = ("depth", "segmentation")
@@ -424,9 +424,7 @@ def unitree_g1_depth_temporal_calibrated_visual_dr_flat_env_cfg(
   """
   cfg = unitree_g1_depth_temporal_deployment_robust_v2_flat_env_cfg(play=play)
   depth_camera = next(
-    sensor
-    for sensor in cfg.scene.sensors or ()
-    if sensor.name == DEPTH_SENSOR_NAME
+    sensor for sensor in cfg.scene.sensors or () if sensor.name == DEPTH_SENSOR_NAME
   )
   assert isinstance(depth_camera, CameraSensorCfg)
 
@@ -466,9 +464,7 @@ def unitree_g1_depth_temporal_mount_range_visual_dr_flat_env_cfg(
   """Depth Student with physically constrained adjustable-mount extrinsics."""
   cfg = unitree_g1_depth_temporal_calibrated_visual_dr_flat_env_cfg(play=play)
   depth_camera = next(
-    sensor
-    for sensor in cfg.scene.sensors or ()
-    if sensor.name == DEPTH_SENSOR_NAME
+    sensor for sensor in cfg.scene.sensors or () if sensor.name == DEPTH_SENSOR_NAME
   )
   assert isinstance(depth_camera, CameraSensorCfg)
   lower_fixed_y = (
@@ -524,5 +520,150 @@ def unitree_g1_depth_temporal_mount_range_strong_visual_dr_flat_env_cfg(
   extrinsics.params["lower_pitch_residual_range"] = (
     -math.radians(4.5),
     math.radians(4.5),
+  )
+  return cfg
+
+
+def unitree_g1_depth_klavier_mount_range_visual_dr_flat_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """Klavier Teacher contract plus the stage-one temporal depth stream."""
+  cfg = unitree_g1_klavier_ball_temporal_flat_env_cfg(play=play)
+  synchronized_vision_delay_key = "klavier_teacher_student_vision"
+
+  # Artificial coordinate loss would contradict a depth image that still
+  # contains the ball. Natural FOV loss and occlusion remain present.
+  if not play:
+    for term in cfg.observations["actor_history"].terms.values():
+      term.params["transition_dropout_probability"] = 0.0
+      term.params["transition_dropout_until_end_probability"] = 0.0
+
+    # Reproduce the exact push curriculum saved with Teacher model_47000.pt.
+    push_max = cfg.curriculum["push_velocity_levels"].params["max_velocity_range"]
+    push_max["x"] = (-1.5, 1.5)
+    push_max["yaw"] = (-1.57, 1.57)
+
+  lower_fixed_y = (
+    DEPTH_CAMERA_LOWER_ESTIMATE_POS[0],
+    DEPTH_CAMERA_UPPER_POS[1],
+    DEPTH_CAMERA_LOWER_ESTIMATE_POS[2],
+  )
+  depth_camera = CameraSensorCfg(
+    name=DEPTH_SENSOR_NAME,
+    parent_body="robot/torso_link",
+    pos=lower_fixed_y,
+    quat=DEPTH_CAMERA_LOWER_ESTIMATE_QUAT,
+    fovy=42.5,
+    width=DEPTH_WIDTH,
+    height=DEPTH_HEIGHT,
+    data_types=("depth",),
+    use_textures=False,
+    use_shadows=False,
+    enabled_geom_groups=(0, 2, 3),
+  )
+  cfg.scene.sensors = (cfg.scene.sensors or ()) + (depth_camera,)
+  cfg.observations["student_proprio"] = deepcopy(cfg.observations["actor"])
+  cfg.observations["depth"] = ObservationGroupCfg(
+    terms={
+      "image": ObservationTermCfg(
+        func=normalized_camera_depth_frame,
+        params={
+          "sensor_name": DEPTH_SENSOR_NAME,
+          "min_depth": DEPTH_MIN_METERS,
+          "max_depth": DEPTH_MAX_METERS,
+          "output_size": (DEPTH_POLICY_HEIGHT, DEPTH_POLICY_WIDTH),
+          "near_noise_std": 0.0 if play else DEPTH_NEAR_NOISE_STD,
+          "far_noise_std": 0.0 if play else DEPTH_FAR_NOISE_STD,
+          "far_distance": DEPTH_FAR_DISTANCE,
+          "dropout_probability": 0.0 if play else 0.05,
+          "depth_scale_range": (1.0, 1.0) if play else (0.98, 1.02),
+          "depth_bias_range": (0.0, 0.0) if play else (-0.02, 0.02),
+          "crop_shift_x_pixels": 0 if play else 1,
+          "crop_shift_y_pixels": 0 if play else 1,
+          "frame_repeat_probability": 0.0,
+        },
+      )
+    },
+    concatenate_terms=True,
+    history_length=TEMPORAL_TEACHER_DEPTH_HISTORY_LENGTH,
+    flatten_history_dim=False,
+    enable_corruption=False,
+  )
+  cfg.observations.pop("critic_history", None)
+
+  if not play:
+    ball_features = cfg.observations["actor_history"].terms["ball_features_b"]
+    ball_features.delay_shared_key = synchronized_vision_delay_key
+    depth_term = cfg.observations["depth"].terms["image"]
+    depth_term.delay_min_lag = 0
+    depth_term.delay_max_lag = 2
+    depth_term.delay_shared_key = synchronized_vision_delay_key
+
+    camera_cfg = SceneEntityCfg("robot", camera_names=(DEPTH_SENSOR_NAME,))
+    cfg.events["randomize_depth_camera_extrinsics"] = EventTermCfg(
+      func=randomize_camera_between_uncertain_limits,
+      mode="reset",
+      params={
+        "lower_position": DEPTH_CAMERA_LOWER_ESTIMATE_POS,
+        "lower_quaternion": DEPTH_CAMERA_LOWER_ESTIMATE_QUAT,
+        "upper_position": DEPTH_CAMERA_UPPER_POS,
+        "upper_quaternion": DEPTH_CAMERA_UPPER_QUAT,
+        "alpha_range": (0.0, 0.25),
+        "fixed_lateral_position": DEPTH_CAMERA_UPPER_POS[1],
+        "lower_x_residual_range": (-0.03, 0.03),
+        "lower_z_residual_range": (-0.01, 0.01),
+        "lower_pitch_residual_range": (
+          -DEPTH_CAMERA_ROTATION_DR_RADIANS,
+          DEPTH_CAMERA_ROTATION_DR_RADIANS,
+        ),
+        "asset_cfg": camera_cfg,
+      },
+    )
+    cfg.events["randomize_depth_camera_fovy"] = EventTermCfg(
+      func=envs_mdp.dr.cam_fovy,
+      mode="reset",
+      params={
+        "ranges": (40.5, 44.5),
+        "operation": "abs",
+        "asset_cfg": camera_cfg,
+      },
+    )
+  return cfg
+
+
+def unitree_g1_depth_klavier_visibility_supervised_flat_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """Klavier Stage 2 with image-derived ball-visibility supervision."""
+  cfg = unitree_g1_depth_klavier_mount_range_visual_dr_flat_env_cfg(play=play)
+  if play:
+    return cfg
+
+  depth_camera = next(
+    sensor for sensor in cfg.scene.sensors or () if sensor.name == DEPTH_SENSOR_NAME
+  )
+  assert isinstance(depth_camera, CameraSensorCfg)
+  depth_camera.data_types = ("depth", "segmentation")
+
+  shared_key = cfg.observations["depth"].terms["image"].delay_shared_key
+  visibility_term = ObservationTermCfg(
+    func=ball_visibility_from_camera_segmentation,
+    params={
+      "sensor_name": DEPTH_SENSOR_NAME,
+      "output_size": (DEPTH_POLICY_HEIGHT, DEPTH_POLICY_WIDTH),
+      "min_ball_pixels": 2,
+      "crop_shift_x_pixels": 1,
+      "crop_shift_y_pixels": 1,
+    },
+    delay_min_lag=0,
+    delay_max_lag=2,
+    delay_shared_key=shared_key,
+  )
+  cfg.observations["depth_visibility_target"] = ObservationGroupCfg(
+    terms={"visible": visibility_term},
+    concatenate_terms=True,
+    history_length=TEMPORAL_TEACHER_DEPTH_HISTORY_LENGTH,
+    flatten_history_dim=False,
+    enable_corruption=False,
   )
   return cfg

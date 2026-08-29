@@ -13,6 +13,7 @@ from mjlab.tasks.velocity_football.rl.runner import VelocityOnPolicyRunner
 
 from .distillation import (
   BallPerceptionDistillation,
+  ConstrainedLatentDistillation,
   DepthCoordinateStudentModel,
   DepthTemporalLatentStudentModel,
 )
@@ -136,16 +137,21 @@ class DepthTeacherDistillationRunner(MjlabOnPolicyRunner):
     missing = list(incompatible.missing_keys)
     if unexpected:
       raise ValueError(f"Teacher has unexpected Student keys: {unexpected}")
-    missing_prefix = (
-      "depth_encoder."
+    missing_prefixes = (
+      ("depth_encoder.", "visibility_head.")
       if isinstance(student, DepthTemporalLatentStudentModel)
-      else "perception."
+      else ("perception.",)
     )
-    if not missing or any(not key.startswith(missing_prefix) for key in missing):
+    if not missing or any(not key.startswith(missing_prefixes) for key in missing):
       raise ValueError(
-        "Student initialization must leave only depth-encoder parameters missing, "
+        "Student initialization must leave only perception parameters missing, "
         f"got {missing}"
       )
+    if isinstance(algorithm, ConstrainedLatentDistillation):
+      # Construction happens before this checkpoint replaces the control MLP.
+      # Anchor the trainable last layer to the loaded Teacher, not to the
+      # discarded random initialization.
+      algorithm._capture_mlp_anchor()
     algorithm.teacher_loaded = True
     print(
       "[INFO] Coordinate Teacher loaded; copied the frozen control backbone, "

@@ -274,6 +274,12 @@ class DepthTemporalLatentStudentModel(MLPModel):
       output_channels=cnn_cfg.get("output_channels", (16, 32, 64)),
       latent_dim=self.depth_latent_dim,
     )
+    self.predict_visibility = bool(cnn_cfg.get("predict_visibility", False))
+    self.visibility_head = (
+      nn.Linear(self.depth_latent_dim, TEMPORAL_FOOTBALL_HISTORY_LENGTH)
+      if self.predict_visibility
+      else None
+    )
     self.freeze_coordinate_actor = bool(cnn_cfg.get("freeze_coordinate_actor", True))
     self.train_mlp_last_layer_only = bool(
       cnn_cfg.get("train_mlp_last_layer_only", False)
@@ -302,6 +308,7 @@ class DepthTemporalLatentStudentModel(MLPModel):
         parameter.requires_grad_(True)
 
     self._visual_latent: torch.Tensor | None = None
+    self._visibility_logits: torch.Tensor | None = None
 
   @property
   def last_mlp_linear(self) -> nn.Linear:
@@ -318,6 +325,12 @@ class DepthTemporalLatentStudentModel(MLPModel):
       raise RuntimeError("Student has not completed a forward pass")
     return self._visual_latent
 
+  @property
+  def visibility_logits(self) -> torch.Tensor:
+    if self._visibility_logits is None:
+      raise RuntimeError("Student has not predicted image visibility")
+    return self._visibility_logits
+
   def _get_latent_dim(self) -> int:
     return self.obs_dim + self.depth_latent_dim
 
@@ -332,6 +345,8 @@ class DepthTemporalLatentStudentModel(MLPModel):
     depth = cast(torch.Tensor, obs["depth"])
     visual_latent = self.depth_encoder(depth)
     self._visual_latent = visual_latent
+    if self.visibility_head is not None:
+      self._visibility_logits = self.visibility_head(visual_latent)
     return torch.cat((self.obs_normalizer(proprio), visual_latent), dim=-1)
 
   def update_normalization(self, obs: TensorDict) -> None:
@@ -489,6 +504,67 @@ class TeacherRolloutDistillation(Distillation):
     return losses
 
 
+class FrozenLatentDistillation(TeacherRolloutDistillation):
+  """Train only the depth encoder with action and Teacher-latent targets."""
+
+  def __init__(self, *args, latent_loss_coef: float = 0.1, **kwargs) -> None:
+    super().__init__(*args, **kwargs)
+    if not isinstance(self._raw_student, DepthTemporalLatentStudentModel):
+      raise TypeError(
+        "FrozenLatentDistillation requires DepthTemporalLatentStudentModel"
+      )
+    if not self._raw_student.freeze_coordinate_actor:
+      raise ValueError("FrozenLatentDistillation requires a frozen control backbone")
+    if latent_loss_coef < 0.0:
+      raise ValueError("latent_loss_coef must be non-negative")
+    unexpected_trainable = [
+      name
+      for name, parameter in self._raw_student.named_parameters()
+      if parameter.requires_grad and not name.startswith("depth_encoder.")
+    ]
+    if unexpected_trainable:
+      raise ValueError(
+        f"Unexpected trainable Student parameters: {unexpected_trainable}"
+      )
+    self.latent_loss_coef = latent_loss_coef
+
+  def update(self) -> dict[str, float]:
+    student = cast(DepthTemporalLatentStudentModel, self._raw_student)
+    self.num_updates += 1
+    totals = {"behavior": 0.0, "latent": 0.0}
+    count = 0
+    for _ in range(self.num_learning_epochs):
+      for batch in self.storage.generator():
+        observations = batch.observations
+        privileged_actions = batch.privileged_actions
+        if observations is None or privileged_actions is None:
+          raise RuntimeError("Distillation batch is missing Teacher supervision")
+        student_actions = self.student(observations)
+        behavior_loss = self.loss_fn(student_actions, privileged_actions)
+        with torch.no_grad():
+          teacher_latent = self._raw_teacher.get_latent(observations)[
+            ..., -student.depth_latent_dim :
+          ]
+        latent_loss = F.smooth_l1_loss(student.visual_latent, teacher_latent)
+        loss = behavior_loss + self.latent_loss_coef * latent_loss
+        self.optimizer.zero_grad()
+        loss.backward()
+        if self.is_multi_gpu:
+          self.reduce_parameters()
+        if self.max_grad_norm:
+          nn.utils.clip_grad_norm_(self.student.parameters(), self.max_grad_norm)
+        self.optimizer.step()
+        totals["behavior"] += behavior_loss.item()
+        totals["latent"] += latent_loss.item()
+        count += 1
+    self.storage.clear()
+    if count == 0:
+      raise RuntimeError("Distillation storage produced no training batches")
+    losses = {name: value / count for name, value in totals.items()}
+    losses["student_rollout_probability"] = self.student_rollout_probability
+    return losses
+
+
 class ConstrainedLatentDistillation(TeacherRolloutDistillation):
   """Action imitation with latent alignment and an anchored final control layer."""
 
@@ -498,6 +574,8 @@ class ConstrainedLatentDistillation(TeacherRolloutDistillation):
     latent_loss_coef: float = 0.1,
     mlp_anchor_loss_coef: float = 1.0e-3,
     mlp_learning_rate: float = 1.0e-5,
+    visibility_loss_coef: float = 0.0,
+    visibility_target_group: str = "depth_visibility_target",
     **kwargs,
   ) -> None:
     super().__init__(*args, **kwargs)
@@ -509,7 +587,9 @@ class ConstrainedLatentDistillation(TeacherRolloutDistillation):
       raise ValueError(
         "ConstrainedLatentDistillation requires train_mlp_last_layer_only=True"
       )
-    if latent_loss_coef < 0.0 or mlp_anchor_loss_coef < 0.0:
+    if (
+      latent_loss_coef < 0.0 or mlp_anchor_loss_coef < 0.0 or visibility_loss_coef < 0.0
+    ):
       raise ValueError("Loss coefficients must be non-negative")
     if mlp_learning_rate <= 0.0:
       raise ValueError("mlp_learning_rate must be positive")
@@ -517,6 +597,10 @@ class ConstrainedLatentDistillation(TeacherRolloutDistillation):
     self.latent_loss_coef = latent_loss_coef
     self.mlp_anchor_loss_coef = mlp_anchor_loss_coef
     self.mlp_learning_rate = mlp_learning_rate
+    self.visibility_loss_coef = visibility_loss_coef
+    self.visibility_target_group = visibility_target_group
+    if visibility_loss_coef > 0.0 and self._raw_student.visibility_head is None:
+      raise ValueError("Visibility loss requires Student predict_visibility=True")
     self._mlp_anchor: dict[str, torch.Tensor] = {}
     self._capture_mlp_anchor()
 
@@ -528,6 +612,8 @@ class ConstrainedLatentDistillation(TeacherRolloutDistillation):
       for parameter in self._raw_student.depth_encoder.parameters()
       if parameter.requires_grad
     ]
+    if self._raw_student.visibility_head is not None:
+      depth_parameters.extend(self._raw_student.visibility_head.parameters())
     mlp_parameters = [
       parameter
       for parameter in self._raw_student.parameters()
@@ -538,6 +624,7 @@ class ConstrainedLatentDistillation(TeacherRolloutDistillation):
       for name, parameter in self._raw_student.named_parameters()
       if parameter.requires_grad
       and not name.startswith("depth_encoder.")
+      and not name.startswith("visibility_head.")
       and id(parameter) not in last_layer_ids
     ]
     if unexpected_trainable:
@@ -565,6 +652,24 @@ class ConstrainedLatentDistillation(TeacherRolloutDistillation):
   def load(self, loaded_dict: dict, load_cfg: dict | None, strict: bool) -> bool:
     """Load model weights and iteration, but start a fresh constrained optimizer."""
     del load_cfg
+    if self._raw_student.visibility_head is not None:
+      student_state = loaded_dict["student_state_dict"]
+      incompatible = self._raw_student.load_state_dict(student_state, strict=False)
+      allowed_missing = {"visibility_head.weight", "visibility_head.bias"}
+      unexpected = set(incompatible.unexpected_keys)
+      missing = set(incompatible.missing_keys)
+      if unexpected or not missing.issubset(allowed_missing):
+        raise ValueError(
+          "Incompatible visibility-supervised Student checkpoint: "
+          f"missing={sorted(missing)}, unexpected={sorted(unexpected)}"
+        )
+      self._raw_teacher.load_state_dict(
+        loaded_dict.get("teacher_state_dict") or loaded_dict["actor_state_dict"],
+        strict=strict,
+      )
+      self.teacher_loaded = True
+      self._capture_mlp_anchor()
+      return True
     load_iteration = super().load(
       loaded_dict,
       {
@@ -589,7 +694,12 @@ class ConstrainedLatentDistillation(TeacherRolloutDistillation):
   def update(self) -> dict[str, float]:
     student = cast(DepthTemporalLatentStudentModel, self._raw_student)
     self.num_updates += 1
-    totals = {"behavior": 0.0, "latent": 0.0, "mlp_anchor": 0.0}
+    totals = {
+      "behavior": 0.0,
+      "latent": 0.0,
+      "mlp_anchor": 0.0,
+      "visibility": 0.0,
+    }
     count = 0
 
     for _ in range(self.num_learning_epochs):
@@ -612,10 +722,27 @@ class ConstrainedLatentDistillation(TeacherRolloutDistillation):
           )
         latent_loss = F.smooth_l1_loss(student.visual_latent, teacher_latent)
         anchor_loss = self._anchor_loss()
+        visibility_loss = torch.zeros((), device=behavior_loss.device)
+        if self.visibility_loss_coef > 0.0:
+          target = observations[self.visibility_target_group]
+          if target.ndim != 3 or target.shape[-1] != 1:
+            raise RuntimeError(
+              f"Visibility target must have shape (B,T,1), got {tuple(target.shape)}"
+            )
+          target = target.squeeze(-1).to(dtype=student.visibility_logits.dtype)
+          if target.shape != student.visibility_logits.shape:
+            raise RuntimeError(
+              "Visibility target/logit shapes differ: "
+              f"{tuple(target.shape)} != {tuple(student.visibility_logits.shape)}"
+            )
+          visibility_loss = F.binary_cross_entropy_with_logits(
+            student.visibility_logits, target
+          )
         loss = (
           behavior_loss
           + self.latent_loss_coef * latent_loss
           + self.mlp_anchor_loss_coef * anchor_loss
+          + self.visibility_loss_coef * visibility_loss
         )
 
         self.optimizer.zero_grad()
@@ -636,6 +763,7 @@ class ConstrainedLatentDistillation(TeacherRolloutDistillation):
         totals["behavior"] += behavior_loss.item()
         totals["latent"] += latent_loss.item()
         totals["mlp_anchor"] += anchor_loss.item()
+        totals["visibility"] += visibility_loss.item()
         count += 1
 
     self.storage.clear()

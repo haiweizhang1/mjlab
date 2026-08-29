@@ -54,6 +54,14 @@ class ObservationTermCfg(ManagerTermBaseCfg):
   """If True and update_period > 0, stagger update timing across envs to avoid
   synchronized resampling."""
 
+  delay_shared_key: str | None = None
+  """Optional key for sharing the exact sampled lag with other terms.
+
+  Terms may have different tensor shapes and therefore keep separate history
+  buffers, but terms with the same key use one per-environment lag sample on
+  every observation update. Their delay ranges and update policies must match.
+  """
+
   history_length: int = 0
   """Number of past observations to keep in history. 0 = no history."""
 
@@ -146,6 +154,7 @@ class ObservationManager(ManagerBase):
         self._group_obs_dim[group_name] = group_term_dims
 
     self._obs_buffer: dict[str, torch.Tensor | dict[str, torch.Tensor]] | None = None
+    self._shared_delay_lags: dict[str, torch.Tensor] = {}
 
   def __str__(self) -> str:
     msg = f"<ObservationManager> contains {len(self._group_obs_term_names)} groups.\n"
@@ -312,6 +321,7 @@ class ObservationManager(ManagerBase):
       return self._obs_buffer
 
     obs_buffer: dict[str, torch.Tensor | dict[str, torch.Tensor]] = dict()
+    self._shared_delay_lags = {}
     for group_name in self._group_obs_term_names:
       obs_buffer[group_name] = self.compute_group(group_name, update_history)
     self._obs_buffer = obs_buffer
@@ -348,7 +358,13 @@ class ObservationManager(ManagerBase):
       if term_cfg.delay_max_lag > 0:
         delay_buffer = self._group_obs_term_delay_buffer[group_name][term_name]
         delay_buffer.append(obs)
-        obs = delay_buffer.compute()
+        shared_key = term_cfg.delay_shared_key
+        if shared_key is None or shared_key not in self._shared_delay_lags:
+          obs = delay_buffer.compute()
+          if shared_key is not None:
+            self._shared_delay_lags[shared_key] = delay_buffer.current_lags.clone()
+        else:
+          obs = delay_buffer.compute(lags=self._shared_delay_lags[shared_key])
       if term_cfg.history_length > 0:
         circular_buffer = self._group_obs_term_history_buffer[group_name][term_name]
         if update_history or not circular_buffer.is_initialized:
@@ -396,6 +412,7 @@ class ObservationManager(ManagerBase):
     self._group_obs_class_instances: dict[str, dict[str, noise_model.NoiseModel]] = {}
     self._group_obs_term_delay_buffer: dict[str, dict[str, DelayBuffer]] = dict()
     self._group_obs_term_history_buffer: dict[str, dict[str, CircularBuffer]] = dict()
+    shared_delay_contracts: dict[str, tuple[object, ...]] = {}
 
     for group_name, group_cfg in self.cfg.items():
       group_cfg: ObservationGroupCfg | None
@@ -463,6 +480,23 @@ class ObservationManager(ManagerBase):
           )
 
         if term_cfg.delay_max_lag > 0:
+          if term_cfg.delay_shared_key is not None:
+            contract = (
+              term_cfg.delay_min_lag,
+              term_cfg.delay_max_lag,
+              term_cfg.delay_per_env,
+              term_cfg.delay_hold_prob,
+              term_cfg.delay_update_period,
+              term_cfg.delay_per_env_phase,
+            )
+            previous = shared_delay_contracts.setdefault(
+              term_cfg.delay_shared_key, contract
+            )
+            if previous != contract:
+              raise ValueError(
+                "Observation terms sharing delay key "
+                f"{term_cfg.delay_shared_key!r} must use identical delay settings"
+              )
           group_entry_delay_buffer[term_name] = DelayBuffer(
             min_lag=term_cfg.delay_min_lag,
             max_lag=term_cfg.delay_max_lag,

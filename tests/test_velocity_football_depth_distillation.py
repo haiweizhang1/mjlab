@@ -176,6 +176,39 @@ def test_temporal_student_can_train_only_final_mlp_layer() -> None:
   )
 
 
+def test_temporal_student_predicts_ten_visibility_logits_when_enabled() -> None:
+  observations = _make_temporal_observations(batch_size=2)
+  student = DepthTemporalLatentStudentModel(
+    obs=observations,
+    obs_groups={"student": ["actor"]},
+    obs_set="student",
+    output_dim=29,
+    hidden_dims=(512, 256, 128),
+    obs_normalization=True,
+    cnn_cfg={
+      "output_channels": (8, 16, 32),
+      "latent_dim": 64,
+      "freeze_coordinate_actor": False,
+      "train_mlp_last_layer_only": True,
+      "predict_visibility": True,
+    },
+    distribution_cfg={
+      "class_name": "GaussianDistribution",
+      "init_std": 1.0,
+      "std_type": "scalar",
+    },
+  )
+
+  actions = student(observations)
+
+  assert actions.shape == (2, 29)
+  assert student.visibility_logits.shape == (2, 10)
+  assert student.visibility_head is not None
+  assert all(
+    parameter.requires_grad for parameter in student.visibility_head.parameters()
+  )
+
+
 def test_depth_student_reconstructs_teacher_input_and_freezes_coordinate_actor() -> (
   None
 ):

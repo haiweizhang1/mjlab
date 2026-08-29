@@ -3,10 +3,15 @@
 from mjlab.tasks.registry import register_mjlab_task
 
 from .env_cfg import (
+  unitree_g1_depth_klavier_mount_range_visual_dr_flat_env_cfg,
+  unitree_g1_depth_klavier_visibility_supervised_flat_env_cfg,
   unitree_g1_depth_temporal_mount_range_strong_visual_dr_flat_env_cfg,
   unitree_g1_depth_temporal_mount_range_visual_dr_flat_env_cfg,
 )
 from .rl_cfg import (
+  unitree_g1_depth_klavier_constrained_latent_runner_cfg,
+  unitree_g1_depth_klavier_frozen_latent_runner_cfg,
+  unitree_g1_depth_klavier_visibility_constrained_runner_cfg,
   unitree_g1_depth_temporal_calibrated_frozen_mlp_runner_cfg,
   unitree_g1_depth_temporal_constrained_latent_runner_cfg,
 )
@@ -19,6 +24,18 @@ DEPTH_BASELINE_TASK_ID = (
 DEPTH_CANDIDATE_TASK_ID = (
   "Mjlab-Velocity-Football-Depth-TemporalTeacher-MountRangeStrongVisualDR-"
   "ConstrainedMLP-Distillation-Flat-Unitree-G1"
+)
+DEPTH_KLAVIER_STAGE1_TASK_ID = (
+  "Mjlab-Velocity-Football-Depth-KlavierTeacher-MountRangeVisualDR-"
+  "FrozenMLP-LatentDistillation-Flat-Unitree-G1"
+)
+DEPTH_KLAVIER_STAGE2_TASK_ID = (
+  "Mjlab-Velocity-Football-Depth-KlavierTeacher-MountRangeVisualDR-"
+  "ConstrainedMLP-LatentDistillation-Flat-Unitree-G1"
+)
+DEPTH_KLAVIER_VISIBILITY_STAGE2_TASK_ID = (
+  "Mjlab-Velocity-Football-Depth-KlavierTeacher-MountRangeVisualDR-"
+  "ConstrainedMLP-LatentVisibilityDistillation-Flat-Unitree-G1"
 )
 
 
@@ -37,5 +54,29 @@ register_mjlab_task(
     play=True
   ),
   rl_cfg=unitree_g1_depth_temporal_constrained_latent_runner_cfg(),
+  runner_cls=DepthTeacherDistillationRunner,
+)
+
+register_mjlab_task(
+  task_id=DEPTH_KLAVIER_STAGE1_TASK_ID,
+  env_cfg=unitree_g1_depth_klavier_mount_range_visual_dr_flat_env_cfg(),
+  play_env_cfg=unitree_g1_depth_klavier_mount_range_visual_dr_flat_env_cfg(play=True),
+  rl_cfg=unitree_g1_depth_klavier_frozen_latent_runner_cfg(),
+  runner_cls=DepthTeacherDistillationRunner,
+)
+
+register_mjlab_task(
+  task_id=DEPTH_KLAVIER_STAGE2_TASK_ID,
+  env_cfg=unitree_g1_depth_klavier_mount_range_visual_dr_flat_env_cfg(),
+  play_env_cfg=unitree_g1_depth_klavier_mount_range_visual_dr_flat_env_cfg(play=True),
+  rl_cfg=unitree_g1_depth_klavier_constrained_latent_runner_cfg(),
+  runner_cls=DepthTeacherDistillationRunner,
+)
+
+register_mjlab_task(
+  task_id=DEPTH_KLAVIER_VISIBILITY_STAGE2_TASK_ID,
+  env_cfg=unitree_g1_depth_klavier_visibility_supervised_flat_env_cfg(),
+  play_env_cfg=unitree_g1_depth_klavier_visibility_supervised_flat_env_cfg(play=True),
+  rl_cfg=unitree_g1_depth_klavier_visibility_constrained_runner_cfg(),
   runner_cls=DepthTeacherDistillationRunner,
 )

@@ -137,3 +137,44 @@ def unitree_g1_velocity_pretrain_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
   cfg = unitree_g1_ppo_runner_cfg()
   cfg.experiment_name = "g1_velocity_football_pretrain"
   return cfg
+
+
+def unitree_g1_klavier_replica_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
+  """Klavier Walk PPO config for the 512-256-128, 20k retraining run."""
+  cfg = unitree_g1_ppo_runner_cfg()
+  cfg.actor.hidden_dims = (512, 256, 128)
+  cfg.critic.hidden_dims = (512, 256, 128)
+  cfg.algorithm.entropy_coef = 0.005
+  cfg.algorithm.symmetry_cfg = None
+  cfg.experiment_name = "g1_velocity_walk_klavier_replica"
+  cfg.save_interval = 1000
+  # The runner saves after iteration 20_000, matching the reference run's
+  # 30_001 setting that produced model_30000.pt.
+  cfg.max_iterations = 20_001
+  cfg.run_name = "unitree_g1_flat_mlp512_noMirrorLoss_seed42_20k_wandb"
+  cfg.upload_model = False
+  return cfg
+
+
+def unitree_g1_klavier_ball_temporal_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
+  """Scheme A PPO: transferred 490-D Walk MLP plus a 64-D causal BallCNN."""
+  cfg = unitree_g1_factorial_ppo_runner_cfg(use_b1_history=True)
+  # Match the Klavier Walk checkpoint MLP so its weights transfer exactly.
+  # Keep the BallCNN unchanged.
+  cfg.actor.hidden_dims = (1024, 512, 256)
+  cfg.critic.hidden_dims = (1024, 512, 256)
+  cfg.algorithm.entropy_coef = 0.01
+  cfg.algorithm.symmetry_cfg = {
+    "data_augmentation_func": (
+      "mjlab.tasks.velocity_football.rl.klavier_symmetry:data_augmentation_func"
+    ),
+    "use_data_augmentation": False,
+    "use_mirror_loss": True,
+    "mirror_loss_coeff": 1.0,
+  }
+  cfg.experiment_name = "g1_velocity_football_klavier_ball_temporal"
+  cfg.save_interval = 200
+  cfg.max_iterations = 50_001
+  cfg.run_name = "schemeA_ballcnn64_longdropout10_from_walk20000_seed42_50k_wandb"
+  cfg.upload_model = False
+  return cfg

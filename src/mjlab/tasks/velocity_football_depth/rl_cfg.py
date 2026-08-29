@@ -125,6 +125,18 @@ class ConstrainedLatentDistillationAlgorithmCfg(TeacherRolloutDistillationAlgori
   latent_loss_coef: float = 0.1
   mlp_anchor_loss_coef: float = 1.0e-3
   mlp_learning_rate: float = 1.0e-5
+  visibility_loss_coef: float = 0.0
+  visibility_target_group: str = "depth_visibility_target"
+
+
+@dataclass
+class FrozenLatentDistillationAlgorithmCfg(TeacherRolloutDistillationAlgorithmCfg):
+  """Stage-one action and latent matching with a frozen control backbone."""
+
+  class_name: str = (
+    "mjlab.tasks.velocity_football_depth.distillation:FrozenLatentDistillation"
+  )
+  latent_loss_coef: float = 0.1
 
 
 @dataclass
@@ -293,6 +305,76 @@ def unitree_g1_depth_temporal_constrained_latent_runner_cfg() -> (
   cfg.algorithm.latent_loss_coef = 0.1
   cfg.algorithm.mlp_anchor_loss_coef = 1.0e-3
   cfg.max_iterations = 10_000
+  return cfg
+
+
+def unitree_g1_depth_klavier_frozen_latent_runner_cfg() -> (
+  TemporalTeacherDistillationRunnerCfg
+):
+  """Stage-one depth distillation from the 1024-512-256 Klavier Teacher."""
+  cfg = unitree_g1_depth_temporal_teacher_distillation_runner_cfg()
+  cfg.algorithm = FrozenLatentDistillationAlgorithmCfg()
+  cfg.algorithm.rollout_policy = "teacher"
+  cfg.teacher.hidden_dims = (1024, 512, 256)
+  cfg.student.hidden_dims = (1024, 512, 256)
+  assert cfg.student.cnn_cfg is not None
+  cfg.student.cnn_cfg["freeze_coordinate_actor"] = True
+  cfg.student.cnn_cfg["train_mlp_last_layer_only"] = False
+  cfg.max_iterations = 10_000
+  cfg.save_interval = 500
+  cfg.run_name = (
+    "DepthStudent_KlavierTeacher47000_FrozenMLP_Latent01_"
+    "SyncDelay02_MountRange025_seed42_10k_wandb"
+  )
+  return cfg
+
+
+def unitree_g1_depth_klavier_constrained_latent_runner_cfg() -> (
+  ConstrainedLatentDistillationRunnerCfg
+):
+  """Stage-two mixed-rollout adaptation of the Klavier depth Student."""
+  base = unitree_g1_depth_temporal_teacher_distillation_runner_cfg()
+  cfg = ConstrainedLatentDistillationRunnerCfg(
+    **{
+      **vars(base),
+      "algorithm": ConstrainedLatentDistillationAlgorithmCfg(),
+    }
+  )
+  cfg.teacher.hidden_dims = (1024, 512, 256)
+  cfg.student.hidden_dims = (1024, 512, 256)
+  assert cfg.student.cnn_cfg is not None
+  cfg.student.cnn_cfg["freeze_coordinate_actor"] = False
+  cfg.student.cnn_cfg["train_mlp_last_layer_only"] = True
+  cfg.algorithm.rollout_policy = "mixed"
+  cfg.algorithm.student_rollout_warmup_updates = 0
+  cfg.algorithm.student_rollout_ramp_updates = 2_000
+  cfg.algorithm.student_rollout_final_probability = 0.3
+  cfg.algorithm.learning_rate = 3.0e-4
+  cfg.algorithm.mlp_learning_rate = 1.0e-5
+  cfg.algorithm.latent_loss_coef = 0.1
+  cfg.algorithm.mlp_anchor_loss_coef = 1.0e-3
+  cfg.max_iterations = 10_000
+  cfg.save_interval = 500
+  cfg.run_name = (
+    "DepthStudent_KlavierTeacher47000_ConstrainedLastMLP_Latent01_"
+    "Mixed030_SyncDelay02_MountRange025_seed42_stage2_10k_wandb"
+  )
+  return cfg
+
+
+def unitree_g1_depth_klavier_visibility_constrained_runner_cfg() -> (
+  ConstrainedLatentDistillationRunnerCfg
+):
+  """Stage-two Klavier adaptation with image-derived visibility labels."""
+  cfg = unitree_g1_depth_klavier_constrained_latent_runner_cfg()
+  assert cfg.student.cnn_cfg is not None
+  cfg.student.cnn_cfg["predict_visibility"] = True
+  cfg.algorithm.visibility_loss_coef = 0.2
+  cfg.algorithm.visibility_target_group = "depth_visibility_target"
+  cfg.run_name = (
+    "DepthStudent_KlavierTeacher47000_ConstrainedLastMLP_Latent01_"
+    "VisibilityBCE02_Mixed030_SyncDelay02_MountRange025_seed42_stage2_10k_wandb"
+  )
   return cfg
 
 

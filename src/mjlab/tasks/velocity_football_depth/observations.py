@@ -393,6 +393,59 @@ def normalized_camera_depth_frame(
   return frame
 
 
+def ball_visibility_from_camera_segmentation(
+  env: ManagerBasedRlEnv,
+  sensor_name: str,
+  output_size: tuple[int, int] = (30, 40),
+  min_ball_pixels: int = 2,
+  crop_shift_x_pixels: int = 0,
+  crop_shift_y_pixels: int = 0,
+) -> torch.Tensor:
+  """Return whether the delivered policy image contains enough ball pixels.
+
+  Segmentation is privileged training supervision only.  The ball mask receives
+  the same per-episode crop translation as depth before being reduced to policy
+  resolution, but it is never included in the exported policy inputs.
+  """
+  if output_size[0] <= 0 or output_size[1] <= 0:
+    raise ValueError(f"output_size must be positive, got {output_size}")
+  if min_ball_pixels <= 0:
+    raise ValueError("min_ball_pixels must be positive")
+  if crop_shift_x_pixels < 0 or crop_shift_y_pixels < 0:
+    raise ValueError("crop shifts must be non-negative")
+
+  sensor: CameraSensor = env.scene[sensor_name]
+  segmentation = sensor.data.segmentation
+  if segmentation is None:
+    raise ValueError(f"Camera '{sensor_name}' requires segmentation supervision")
+
+  ball = env.scene["ball"]
+  geom_ids = ball.indexing.geom_ids.to(device=segmentation.device)
+  object_ids = segmentation[..., 0]
+  object_types = segmentation[..., 1]
+  is_geom = object_types == int(mujoco.mjtObj.mjOBJ_GEOM)
+  ball_pixels = (object_ids[..., None] == geom_ids).any(dim=-1) & is_geom
+  mask = ball_pixels[:, None].to(dtype=torch.float32)
+
+  if crop_shift_x_pixels > 0 or crop_shift_y_pixels > 0:
+    state = _depth_randomization_state(
+      env,
+      sensor_name,
+      mask.device,
+      depth_scale_range=(1.0, 1.0),
+      depth_bias_range=(0.0, 0.0),
+      crop_shift_x_pixels=crop_shift_x_pixels,
+      crop_shift_y_pixels=crop_shift_y_pixels,
+    )
+    mask = _shift_depth_image(mask, state["crop_x"], state["crop_y"])
+    mask = torch.where(torch.isfinite(mask), mask, torch.zeros_like(mask))
+
+  if mask.shape[-2:] != output_size:
+    mask = F.adaptive_max_pool2d(mask, output_size)
+  visible = mask.flatten(1).sum(dim=1, keepdim=True) >= min_ball_pixels
+  return visible.to(dtype=torch.float32)
+
+
 def ball_auxiliary_target(
   env: ManagerBasedRlEnv,
   sensor_name: str,

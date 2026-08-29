@@ -66,6 +66,37 @@ def test_no_delay_by_default(mock_env, simple_obs_func):
   assert policy_obs.shape == (4, 3)
 
 
+def test_shared_delay_key_uses_identical_per_env_lags(mock_env, device):
+  """Different-shaped observations share one exact stochastic lag sample."""
+  counters = {"coordinates": 0, "depth": 0}
+
+  def coordinates(env):
+    counters["coordinates"] += 1
+    return torch.full((env.num_envs, 7), float(counters["coordinates"]), device=device)
+
+  def depth(env):
+    counters["depth"] += 1
+    return torch.full((env.num_envs, 3, 4), float(counters["depth"]), device=device)
+
+  delay = {"delay_min_lag": 0, "delay_max_lag": 2, "delay_shared_key": "vision"}
+  cfg = {
+    "coordinates": ObservationGroupCfg(
+      terms={"value": ObservationTermCfg(func=coordinates, params={}, **delay)}
+    ),
+    "depth": ObservationGroupCfg(
+      terms={"value": ObservationTermCfg(func=depth, params={}, **delay)}
+    ),
+  }
+  manager = ObservationManager(cfg, mock_env)
+  for _ in range(8):
+    manager.compute(update_history=True)
+    coordinate_buffer = manager._group_obs_term_delay_buffer["coordinates"]["value"]
+    depth_buffer = manager._group_obs_term_delay_buffer["depth"]["value"]
+    torch.testing.assert_close(
+      coordinate_buffer.current_lags, depth_buffer.current_lags
+    )
+
+
 def test_constant_delay(mock_env, simple_obs_func, device):
   """Test observation with constant delay (min_lag = max_lag = 2)."""
 

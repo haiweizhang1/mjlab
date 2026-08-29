@@ -226,7 +226,7 @@ class DelayBuffer:
     """
     self._buffer.append(data)
 
-  def compute(self) -> torch.Tensor:
+  def compute(self, lags: torch.Tensor | None = None) -> torch.Tensor:
     """Compute delayed observation for current step.
 
     Returns:
@@ -235,7 +235,11 @@ class DelayBuffer:
     if not self.is_initialized:
       raise RuntimeError("Buffer not initialized. Call append() first.")
 
-    self._update_lags()
+    if lags is None:
+      self._update_lags()
+    else:
+      self.set_lags(lags)
+      self._step_count += 1
 
     # Clamp lags to valid range [0, buffer_length - 1].
     # Buffer may not be full yet (e.g., only 2 frames but sampled lag=3).

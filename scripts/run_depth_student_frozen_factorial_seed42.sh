@@ -45,6 +45,8 @@ export WARP_CACHE_PATH="/tmp/mjlab-warp-$variant"
 export MPLCONFIGDIR="/tmp/mjlab-mpl-$variant"
 export XDG_CACHE_HOME="/tmp/mjlab-xdg-$variant"
 export PYTORCH_ALLOC_CONF=expandable_segments:True
+export MUJOCO_GL="${MUJOCO_GL:-egl}"
+export PYOPENGL_PLATFORM="${PYOPENGL_PLATFORM:-egl}"
 
 exec uv run train \
   "$task_id" \

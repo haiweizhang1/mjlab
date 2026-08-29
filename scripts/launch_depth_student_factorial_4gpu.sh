@@ -8,6 +8,8 @@ gpu_ids_raw="${GPU_IDS:-0 1 2 3}"
 read -r -a gpu_ids <<< "$gpu_ids_raw"
 variants=(e1 e2 e3 e4)
 export UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/mjlab-uv-cache}"
+launch_stamp="$(date +%Y%m%d_%H%M%S)"
+launch_log_dir="$repo_dir/logs/launch/depth_factorial_$launch_stamp"
 
 if ! command -v tmux >/dev/null 2>&1; then
   echo "ERROR: tmux is required for the four-job launcher" >&2
@@ -21,6 +23,7 @@ fi
 echo "Preparing the shared uv environment once before launching four jobs..."
 cd "$repo_dir"
 uv sync --locked
+mkdir -p "$launch_log_dir"
 
 for index in "${!variants[@]}"; do
   variant="${variants[$index]}"
@@ -30,9 +33,13 @@ for index in "${!variants[@]}"; do
     echo "ERROR: tmux session '$session' already exists" >&2
     exit 1
   fi
-  tmux new-session -d -s "$session" \
-    "cd '$repo_dir' && CUDA_VISIBLE_DEVICES='$gpu' NUM_ENVS='$num_envs' bash '$runner' '$variant'"
-  echo "Started $variant in tmux session $session on GPU $gpu ($num_envs envs)"
+  log_file="$launch_log_dir/$variant.log"
+  tmux new-session -d -s "$session" -c "$repo_dir"
+  tmux send-keys -t "$session" \
+    "CUDA_VISIBLE_DEVICES='$gpu' NUM_ENVS='$num_envs' bash '$runner' '$variant' 2>&1 | tee '$log_file'" \
+    C-m
+  echo "Started $variant in tmux session $session on GPU $gpu ($num_envs envs); log: $log_file"
 done
 
 echo "Use 'tmux ls' to list jobs and 'tmux attach -t depth_e1' to inspect one."
+echo "Persistent launch logs: $launch_log_dir"

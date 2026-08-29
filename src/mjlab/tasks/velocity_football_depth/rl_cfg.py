@@ -137,6 +137,7 @@ class FrozenLatentDistillationAlgorithmCfg(TeacherRolloutDistillationAlgorithmCf
     "mjlab.tasks.velocity_football_depth.distillation:FrozenLatentDistillation"
   )
   latent_loss_coef: float = 0.1
+  mirror_loss_coef: float = 0.0
 
 
 @dataclass
@@ -326,6 +327,16 @@ def unitree_g1_depth_klavier_frozen_latent_runner_cfg() -> (
     "DepthStudent_KlavierTeacher47000_FrozenMLP_Latent01_"
     "SyncDelay02_MountRange025_seed42_10k_wandb"
   )
+  return cfg
+
+
+def unitree_g1_depth_klavier_frozen_latent_symmetric_runner_cfg() -> (
+  TemporalTeacherDistillationRunnerCfg
+):
+  """Frozen-MLP stage one with depth/proprio mirror consistency."""
+  cfg = unitree_g1_depth_klavier_frozen_latent_runner_cfg()
+  assert isinstance(cfg.algorithm, FrozenLatentDistillationAlgorithmCfg)
+  cfg.algorithm.mirror_loss_coef = 1.0
   return cfg
 
 

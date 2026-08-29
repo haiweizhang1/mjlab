@@ -24,7 +24,8 @@ _SWAP_PAIRS = (
 _INVERT = (2, 3, 4, 5, 6, 7, 15, 16, 17, 18, 19, 20, 23, 24, 27, 28)
 
 
-def _mirror_joint(value: torch.Tensor) -> torch.Tensor:
+def mirror_joint(value: torch.Tensor) -> torch.Tensor:
+  """Mirror a batch of Klavier-ordered joint values or actions."""
   index = torch.arange(_NUM_ACTIONS, device=value.device)
   for left, right in _SWAP_PAIRS:
     index[left], index[right] = index[right].clone(), index[left].clone()
@@ -33,7 +34,8 @@ def _mirror_joint(value: torch.Tensor) -> torch.Tensor:
   return result
 
 
-def _mirror_actor_observation(value: torch.Tensor) -> torch.Tensor:
+def mirror_actor_observation(value: torch.Tensor) -> torch.Tensor:
+  """Mirror the 490-D, five-frame Klavier proprioceptive observation."""
   if value.shape[-1] != 490:
     raise ValueError(
       f"Klavier mirror expects 490 Actor observations, got {value.shape}"
@@ -51,7 +53,7 @@ def _mirror_actor_observation(value: torch.Tensor) -> torch.Tensor:
   for base in (11, 11 + _NUM_ACTIONS, 11 + 2 * _NUM_ACTIONS):
     for frame in range(_FRAME_STACK):
       start = base * _FRAME_STACK + frame * _NUM_ACTIONS
-      result[..., start : start + _NUM_ACTIONS] = _mirror_joint(
+      result[..., start : start + _NUM_ACTIONS] = mirror_joint(
         value[..., start : start + _NUM_ACTIONS]
       )
   return result
@@ -76,11 +78,11 @@ def data_augmentation_func(env, obs, actions):
   augmented_obs = None
   if obs is not None:
     mirrored = obs.clone()
-    mirrored["actor"] = _mirror_actor_observation(obs["actor"])
+    mirrored["actor"] = mirror_actor_observation(obs["actor"])
     if "actor_history" in obs.keys():
       mirrored["actor_history"] = _mirror_ball_history(obs["actor_history"])
     augmented_obs = torch.cat((obs, mirrored), dim=0)
   augmented_actions = None
   if actions is not None:
-    augmented_actions = torch.cat((actions, _mirror_joint(actions)), dim=0)
+    augmented_actions = torch.cat((actions, mirror_joint(actions)), dim=0)
   return augmented_obs, augmented_actions

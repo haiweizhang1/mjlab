@@ -13,6 +13,10 @@ from rsl_rl.models import MLPModel
 from tensordict import TensorDict
 
 from mjlab.rl.spatial_softmax import SpatialSoftmax
+from mjlab.tasks.velocity_football.rl.klavier_symmetry import (
+  mirror_actor_observation,
+  mirror_joint,
+)
 
 PROPRIO_HISTORY_DIM = 490
 BALL_POSITION_HISTORY_DIM = 10
@@ -507,7 +511,13 @@ class TeacherRolloutDistillation(Distillation):
 class FrozenLatentDistillation(TeacherRolloutDistillation):
   """Train only the depth encoder with action and Teacher-latent targets."""
 
-  def __init__(self, *args, latent_loss_coef: float = 0.1, **kwargs) -> None:
+  def __init__(
+    self,
+    *args,
+    latent_loss_coef: float = 0.1,
+    mirror_loss_coef: float = 0.0,
+    **kwargs,
+  ) -> None:
     super().__init__(*args, **kwargs)
     if not isinstance(self._raw_student, DepthTemporalLatentStudentModel):
       raise TypeError(
@@ -517,6 +527,8 @@ class FrozenLatentDistillation(TeacherRolloutDistillation):
       raise ValueError("FrozenLatentDistillation requires a frozen control backbone")
     if latent_loss_coef < 0.0:
       raise ValueError("latent_loss_coef must be non-negative")
+    if mirror_loss_coef < 0.0:
+      raise ValueError("mirror_loss_coef must be non-negative")
     unexpected_trainable = [
       name
       for name, parameter in self._raw_student.named_parameters()
@@ -527,11 +539,22 @@ class FrozenLatentDistillation(TeacherRolloutDistillation):
         f"Unexpected trainable Student parameters: {unexpected_trainable}"
       )
     self.latent_loss_coef = latent_loss_coef
+    self.mirror_loss_coef = mirror_loss_coef
+
+  @staticmethod
+  def _mirrored_student_observations(observations: TensorDict) -> TensorDict:
+    """Mirror only the inputs consumed by the depth Student."""
+    mirrored = observations.clone()
+    mirrored["student_proprio"] = mirror_actor_observation(
+      observations["student_proprio"]
+    )
+    mirrored["depth"] = torch.flip(observations["depth"], dims=(-1,))
+    return mirrored
 
   def update(self) -> dict[str, float]:
     student = cast(DepthTemporalLatentStudentModel, self._raw_student)
     self.num_updates += 1
-    totals = {"behavior": 0.0, "latent": 0.0}
+    totals = {"behavior": 0.0, "latent": 0.0, "mirror": 0.0}
     count = 0
     for _ in range(self.num_learning_epochs):
       for batch in self.storage.generator():
@@ -546,7 +569,17 @@ class FrozenLatentDistillation(TeacherRolloutDistillation):
             ..., -student.depth_latent_dim :
           ]
         latent_loss = F.smooth_l1_loss(student.visual_latent, teacher_latent)
-        loss = behavior_loss + self.latent_loss_coef * latent_loss
+        mirror_loss = behavior_loss.new_zeros(())
+        if self.mirror_loss_coef > 0.0:
+          mirrored_observations = self._mirrored_student_observations(observations)
+          mirrored_actions = self.student(mirrored_observations)
+          mirror_target = mirror_joint(student_actions.detach())
+          mirror_loss = F.mse_loss(mirrored_actions, mirror_target)
+        loss = (
+          behavior_loss
+          + self.latent_loss_coef * latent_loss
+          + self.mirror_loss_coef * mirror_loss
+        )
         self.optimizer.zero_grad()
         loss.backward()
         if self.is_multi_gpu:
@@ -556,6 +589,7 @@ class FrozenLatentDistillation(TeacherRolloutDistillation):
         self.optimizer.step()
         totals["behavior"] += behavior_loss.item()
         totals["latent"] += latent_loss.item()
+        totals["mirror"] += mirror_loss.item()
         count += 1
     self.storage.clear()
     if count == 0:

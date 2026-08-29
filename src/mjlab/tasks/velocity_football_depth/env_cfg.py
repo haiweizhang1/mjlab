@@ -631,6 +631,15 @@ def unitree_g1_depth_klavier_mount_range_visual_dr_flat_env_cfg(
   return cfg
 
 
+def unitree_g1_depth_klavier_no_push_curriculum_flat_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """Klavier depth task with the base push event but no push curriculum."""
+  cfg = unitree_g1_depth_klavier_mount_range_visual_dr_flat_env_cfg(play=play)
+  cfg.curriculum.pop("push_velocity_levels", None)
+  return cfg
+
+
 def unitree_g1_depth_klavier_visibility_supervised_flat_env_cfg(
   play: bool = False,
 ) -> ManagerBasedRlEnvCfg:

@@ -2,13 +2,22 @@
 
 from typing import Any, cast
 
+import pytest
 import torch
 from tensordict import TensorDict
 
 from mjlab.tasks.registry import load_env_cfg, load_rl_cfg, load_runner_cls
+from mjlab.tasks.velocity_football.rl.klavier_symmetry import (
+  mirror_actor_observation,
+  mirror_joint,
+)
 from mjlab.tasks.velocity_football_depth import (
   DEPTH_BASELINE_TASK_ID,
   DEPTH_CANDIDATE_TASK_ID,
+  DEPTH_KLAVIER_FACTORIAL_PUSH_OFF_NO_SYM_TASK_ID,
+  DEPTH_KLAVIER_FACTORIAL_PUSH_OFF_SYM_TASK_ID,
+  DEPTH_KLAVIER_FACTORIAL_PUSH_ON_NO_SYM_TASK_ID,
+  DEPTH_KLAVIER_FACTORIAL_PUSH_ON_SYM_TASK_ID,
 )
 from mjlab.tasks.velocity_football_depth.distillation import (
   FOOTBALL_HISTORY_DIM,
@@ -18,6 +27,7 @@ from mjlab.tasks.velocity_football_depth.distillation import (
   BallPerceptionDistillation,
   DepthCoordinateStudentModel,
   DepthTemporalLatentStudentModel,
+  FrozenLatentDistillation,
 )
 from mjlab.tasks.velocity_football_depth.runner import (
   DepthTeacherDistillationRunner,
@@ -278,3 +288,45 @@ def test_temporal_depth_student_ignores_direct_coordinate_observations() -> None
   assert not hasattr(student, "predicted_football_history")
   assert not any(name.startswith("cnn_encoders") for name, _ in student.named_modules())
   assert exported.input_names == ["proprio", "depth"]
+
+
+def test_depth_student_mirror_transform_is_an_involution() -> None:
+  observations = _make_temporal_observations(batch_size=2)
+  mirrored = FrozenLatentDistillation._mirrored_student_observations(observations)
+  restored = FrozenLatentDistillation._mirrored_student_observations(mirrored)
+
+  torch.testing.assert_close(
+    restored["student_proprio"], observations["student_proprio"]
+  )
+  torch.testing.assert_close(restored["depth"], observations["depth"])
+  torch.testing.assert_close(
+    mirror_actor_observation(mirror_actor_observation(observations["actor"])),
+    observations["actor"],
+  )
+  actions = torch.randn(2, 29)
+  torch.testing.assert_close(mirror_joint(mirror_joint(actions)), actions)
+
+
+@pytest.mark.parametrize(
+  ("task_id", "push_curriculum", "mirror_loss_coef"),
+  (
+    (DEPTH_KLAVIER_FACTORIAL_PUSH_OFF_NO_SYM_TASK_ID, False, 0.0),
+    (DEPTH_KLAVIER_FACTORIAL_PUSH_OFF_SYM_TASK_ID, False, 1.0),
+    (DEPTH_KLAVIER_FACTORIAL_PUSH_ON_NO_SYM_TASK_ID, True, 0.0),
+    (DEPTH_KLAVIER_FACTORIAL_PUSH_ON_SYM_TASK_ID, True, 1.0),
+  ),
+)
+def test_klavier_frozen_mlp_factorial_configuration(
+  task_id: str,
+  push_curriculum: bool,
+  mirror_loss_coef: float,
+) -> None:
+  env_cfg = load_env_cfg(task_id)
+  runner_cfg = cast(Any, load_rl_cfg(task_id))
+
+  assert ("push_velocity_levels" in env_cfg.curriculum) is push_curriculum
+  assert runner_cfg.student.cnn_cfg["freeze_coordinate_actor"] is True
+  assert runner_cfg.student.cnn_cfg["train_mlp_last_layer_only"] is False
+  assert runner_cfg.algorithm.rollout_policy == "teacher"
+  assert runner_cfg.algorithm.mirror_loss_coef == mirror_loss_coef
+  assert runner_cfg.algorithm.symmetry_cfg is None

@@ -13,8 +13,9 @@
   Student 自己闭环 rollout。
 - 新版 Teacher 更强、更接近 Klavier/真机扰动，但其控制 MLP 从 `512/256/128` 增大到
   `1024/512/256`，Student 的拟合任务明显更难。
-- 新版 E1–E4 因子实验目前是“冻结 MLP + 100% Teacher rollout”的第一阶段消融。
-  其中 reward 和 episode length 主要描述 Teacher 驱动的轨迹，不能证明 Student 闭环好。
+- 新版 E1–E4 首轮实验采用“冻结 MLP + 100% Teacher rollout”，其 reward 和 episode
+  length 主要描述 Teacher 驱动的轨迹，不能证明 Student 闭环好。2026-08-30 已将重训配置
+  改为旧 constrained 方案的 mixed rollout，Student 在 2000 updates 内由 0% 增至 30%。
 - 比较 Student 时应以相同相机、相同命令、相同推力、相同随机种子的固定闭环 sim2sim
   成功率为主，不能只比较 behavior/latent loss 或训练 reward。
 
@@ -170,8 +171,9 @@ Teacher 驱动的采样轨迹稳定，不代表 Student 闭环稳定。冻结 ML
 
 ## 6. 新版 E1–E4 因子实验定义
 
-四组均为：Teacher47000、4096 env/GPU、30k iterations、每 1000 保存、控制 MLP 完全
-冻结、100% Teacher rollout、Huber + latent 0.1。
+四组重训均为：Teacher47000、4096 env/GPU、从 0 开始、30k iterations、每 1000 保存、
+控制 MLP 完全冻结、Huber + latent 0.1。rollout 采用旧 constrained Student 的设置：
+`mixed`，warmup 0，2000 updates 内将 Student 概率从 0% 线性提高到 30%，之后保持 30%。
 
 | 实验 | 推力课程 | Student mirror loss |
 |---|---|---:|
@@ -180,9 +182,10 @@ Teacher 驱动的采样轨迹稳定，不代表 Student 闭环稳定。冻结 ML
 | E3 | 开启 | 0 |
 | E4 | 开启 | 1.0 |
 
-这四组只回答“推力课程和 Student 对称损失是否改善冻结阶段拟合”，不能替代第二阶段
-mixed rollout。选出第一阶段 checkpoint 后，仍需开放 MLP 最后一层 `1e-5`，将 Student
-rollout 逐渐提高到 30%，并进行统一闭环评估。
+这四组回答“推力课程和 Student 对称损失是否改善冻结控制骨干时的闭环蒸馏”。由于重训
+已经包含 30% Student rollout，能够减少首轮纯 Teacher rollout 的分布偏移。选出最佳
+checkpoint 后，仍可单独进行第二阶段：开放 MLP 最后一层 `1e-5`，保留 mixed30，并进行
+统一闭环评估。
 
 ## 7. Checkpoint 身份校验
 
@@ -219,4 +222,3 @@ rollout 逐渐提高到 30%，并进行统一闭环评估。
 - `scripts/run_depth_student_frozen_factorial_seed42.sh`
 - `scripts/launch_depth_student_factorial_4gpu.sh`
 - [旧 Teacher 基线记录](实验记录/DT-TEACHER-BASE-0-20260814-B1-A1R0-LongDropout10教师基线.md)
-

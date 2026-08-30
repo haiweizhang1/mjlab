@@ -12,8 +12,8 @@ from .env_cfg import (
 )
 from .rl_cfg import (
   unitree_g1_depth_klavier_constrained_latent_runner_cfg,
+  unitree_g1_depth_klavier_factorial_mixed_runner_cfg,
   unitree_g1_depth_klavier_frozen_latent_runner_cfg,
-  unitree_g1_depth_klavier_frozen_latent_symmetric_runner_cfg,
   unitree_g1_depth_klavier_visibility_constrained_runner_cfg,
   unitree_g1_depth_temporal_calibrated_frozen_mlp_runner_cfg,
   unitree_g1_depth_temporal_constrained_latent_runner_cfg,
@@ -126,16 +126,13 @@ def _register_frozen_factorial_task(
     if push_curriculum
     else unitree_g1_depth_klavier_no_push_curriculum_flat_env_cfg
   )
-  rl_factory = (
-    unitree_g1_depth_klavier_frozen_latent_symmetric_runner_cfg
-    if mirror_loss
-    else unitree_g1_depth_klavier_frozen_latent_runner_cfg
-  )
   register_mjlab_task(
     task_id=task_id,
     env_cfg=env_factory(),
     play_env_cfg=env_factory(play=True),
-    rl_cfg=rl_factory(),
+    rl_cfg=unitree_g1_depth_klavier_factorial_mixed_runner_cfg(
+      mirror_loss=mirror_loss
+    ),
     runner_cls=DepthTeacherDistillationRunner,
   )
 

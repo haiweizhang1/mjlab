@@ -15,19 +15,19 @@ max_iterations="${MAX_ITERATIONS:-30000}"
 case "$variant" in
   e1)
     task_id="Mjlab-Velocity-Football-Depth-KlavierTeacher-PushCurrOff-FrozenMLP-NoSym-LatentDistillation-Flat-Unitree-G1"
-    run_name="E1_PushCurrOff_FrozenMLP_NoSym_Teacher47000_seed42_${max_iterations}iter_wandb"
+    run_name="E1_PushCurrOff_FrozenMLP_NoSym_Mixed030_Teacher47000_seed42_${max_iterations}iter_wandb"
     ;;
   e2)
     task_id="Mjlab-Velocity-Football-Depth-KlavierTeacher-PushCurrOff-FrozenMLP-Sym-LatentDistillation-Flat-Unitree-G1"
-    run_name="E2_PushCurrOff_FrozenMLP_Sym1_Teacher47000_seed42_${max_iterations}iter_wandb"
+    run_name="E2_PushCurrOff_FrozenMLP_Sym1_Mixed030_Teacher47000_seed42_${max_iterations}iter_wandb"
     ;;
   e3)
     task_id="Mjlab-Velocity-Football-Depth-KlavierTeacher-PushCurrOn-FrozenMLP-NoSym-LatentDistillation-Flat-Unitree-G1"
-    run_name="E3_PushCurrOn_FrozenMLP_NoSym_Teacher47000_seed42_${max_iterations}iter_wandb"
+    run_name="E3_PushCurrOn_FrozenMLP_NoSym_Mixed030_Teacher47000_seed42_${max_iterations}iter_wandb"
     ;;
   e4)
     task_id="Mjlab-Velocity-Football-Depth-KlavierTeacher-PushCurrOn-FrozenMLP-Sym-LatentDistillation-Flat-Unitree-G1"
-    run_name="E4_PushCurrOn_FrozenMLP_Sym1_Teacher47000_seed42_${max_iterations}iter_wandb"
+    run_name="E4_PushCurrOn_FrozenMLP_Sym1_Mixed030_Teacher47000_seed42_${max_iterations}iter_wandb"
     ;;
   *)
     echo "ERROR: unknown variant '$variant'; expected e1, e2, e3, or e4" >&2
@@ -60,7 +60,10 @@ exec "$train_entrypoint" \
   --pretrained-checkpoint "$teacher_checkpoint" \
   --env.scene.num-envs "$num_envs" \
   --agent.seed 42 \
-  --agent.algorithm.rollout-policy teacher \
+  --agent.algorithm.rollout-policy mixed \
+  --agent.algorithm.student-rollout-warmup-updates 0 \
+  --agent.algorithm.student-rollout-ramp-updates 2000 \
+  --agent.algorithm.student-rollout-final-probability 0.3 \
   --agent.algorithm.latent-loss-coef 0.1 \
   --agent.max-iterations "$max_iterations" \
   --agent.save-interval 1000 \

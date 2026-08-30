@@ -340,6 +340,22 @@ def unitree_g1_depth_klavier_frozen_latent_symmetric_runner_cfg() -> (
   return cfg
 
 
+def unitree_g1_depth_klavier_factorial_mixed_runner_cfg(
+  *, mirror_loss: bool = False
+) -> TemporalTeacherDistillationRunnerCfg:
+  """Frozen-backbone factorial config using the legacy mixed30 rollout."""
+  cfg = (
+    unitree_g1_depth_klavier_frozen_latent_symmetric_runner_cfg()
+    if mirror_loss
+    else unitree_g1_depth_klavier_frozen_latent_runner_cfg()
+  )
+  cfg.algorithm.rollout_policy = "mixed"
+  cfg.algorithm.student_rollout_warmup_updates = 0
+  cfg.algorithm.student_rollout_ramp_updates = 2_000
+  cfg.algorithm.student_rollout_final_probability = 0.3
+  return cfg
+
+
 def unitree_g1_depth_klavier_constrained_latent_runner_cfg() -> (
   ConstrainedLatentDistillationRunnerCfg
 ):

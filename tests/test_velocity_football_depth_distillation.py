@@ -327,6 +327,11 @@ def test_klavier_frozen_mlp_factorial_configuration(
   assert ("push_velocity_levels" in env_cfg.curriculum) is push_curriculum
   assert runner_cfg.student.cnn_cfg["freeze_coordinate_actor"] is True
   assert runner_cfg.student.cnn_cfg["train_mlp_last_layer_only"] is False
-  assert runner_cfg.algorithm.rollout_policy == "teacher"
+  assert runner_cfg.algorithm.rollout_policy == "mixed"
+  assert runner_cfg.algorithm.student_rollout_warmup_updates == 0
+  assert runner_cfg.algorithm.student_rollout_ramp_updates == 2_000
+  assert runner_cfg.algorithm.student_rollout_final_probability == pytest.approx(
+    0.3
+  )
   assert runner_cfg.algorithm.mirror_loss_coef == mirror_loss_coef
   assert runner_cfg.algorithm.symmetry_cfg is None

@@ -10,7 +10,7 @@ read -r -a gpu_ids <<< "$gpu_ids_raw"
 variants=(e1 e2 e3 e4)
 export UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/mjlab-uv-cache}"
 launch_stamp="$(date +%Y%m%d_%H%M%S)"
-launch_log_dir="$repo_dir/logs/launch/depth_factorial_$launch_stamp"
+launch_log_dir="$repo_dir/logs/launch/depth_factorial_mixed030_$launch_stamp"
 
 if ! command -v tmux >/dev/null 2>&1; then
   echo "ERROR: tmux is required for the four-job launcher" >&2

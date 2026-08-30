@@ -11,6 +11,7 @@ from mjlab.sensor import CameraSensorCfg
 from mjlab.tasks.registry import list_tasks, load_env_cfg, load_rl_cfg, load_runner_cls
 from mjlab.tasks.velocity_football_depth import (
   DEPTH_BASELINE_TASK_ID,
+  DEPTH_CALIBRATED_LEGACY_TASK_ID,
   DEPTH_CANDIDATE_TASK_ID,
   DEPTH_KLAVIER_FACTORIAL_PUSH_OFF_NO_SYM_TASK_ID,
   DEPTH_KLAVIER_FACTORIAL_PUSH_OFF_SYM_TASK_ID,
@@ -41,6 +42,7 @@ def test_only_expected_depth_football_tasks_are_registered() -> None:
   }
   assert task_ids == {
     DEPTH_BASELINE_TASK_ID,
+    DEPTH_CALIBRATED_LEGACY_TASK_ID,
     DEPTH_CANDIDATE_TASK_ID,
     DEPTH_KLAVIER_STAGE1_TASK_ID,
     DEPTH_KLAVIER_STAGE2_TASK_ID,
@@ -56,6 +58,7 @@ def test_only_expected_depth_football_tasks_are_registered() -> None:
   "task_id",
   (
     DEPTH_BASELINE_TASK_ID,
+    DEPTH_CALIBRATED_LEGACY_TASK_ID,
     DEPTH_CANDIDATE_TASK_ID,
     DEPTH_KLAVIER_STAGE1_TASK_ID,
     DEPTH_KLAVIER_STAGE2_TASK_ID,

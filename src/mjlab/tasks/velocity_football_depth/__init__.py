@@ -6,6 +6,7 @@ from .env_cfg import (
   unitree_g1_depth_klavier_mount_range_visual_dr_flat_env_cfg,
   unitree_g1_depth_klavier_no_push_curriculum_flat_env_cfg,
   unitree_g1_depth_klavier_visibility_supervised_flat_env_cfg,
+  unitree_g1_depth_temporal_calibrated_visual_dr_flat_env_cfg,
   unitree_g1_depth_temporal_mount_range_strong_visual_dr_flat_env_cfg,
   unitree_g1_depth_temporal_mount_range_visual_dr_flat_env_cfg,
 )
@@ -21,6 +22,10 @@ from .runner import DepthTeacherDistillationRunner
 
 DEPTH_BASELINE_TASK_ID = (
   "Mjlab-Velocity-Football-Depth-TemporalTeacher-MountRangeVisualDR-"
+  "FrozenMLP-Distillation-Flat-Unitree-G1"
+)
+DEPTH_CALIBRATED_LEGACY_TASK_ID = (
+  "Mjlab-Velocity-Football-Depth-TemporalTeacher-CalibratedVisualDR-"
   "FrozenMLP-Distillation-Flat-Unitree-G1"
 )
 DEPTH_CANDIDATE_TASK_ID = (
@@ -61,6 +66,16 @@ register_mjlab_task(
   task_id=DEPTH_BASELINE_TASK_ID,
   env_cfg=unitree_g1_depth_temporal_mount_range_visual_dr_flat_env_cfg(),
   play_env_cfg=unitree_g1_depth_temporal_mount_range_visual_dr_flat_env_cfg(play=True),
+  rl_cfg=unitree_g1_depth_temporal_calibrated_frozen_mlp_runner_cfg(),
+  runner_cls=DepthTeacherDistillationRunner,
+)
+
+register_mjlab_task(
+  task_id=DEPTH_CALIBRATED_LEGACY_TASK_ID,
+  env_cfg=unitree_g1_depth_temporal_calibrated_visual_dr_flat_env_cfg(),
+  play_env_cfg=unitree_g1_depth_temporal_calibrated_visual_dr_flat_env_cfg(
+    play=True
+  ),
   rl_cfg=unitree_g1_depth_temporal_calibrated_frozen_mlp_runner_cfg(),
   runner_cls=DepthTeacherDistillationRunner,
 )

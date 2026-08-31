@@ -12,6 +12,7 @@ from .env_cfg import (
 )
 from .rl_cfg import (
   unitree_g1_depth_klavier_constrained_latent_runner_cfg,
+  unitree_g1_depth_klavier_e1_stage2_runner_cfg,
   unitree_g1_depth_klavier_factorial_mixed_runner_cfg,
   unitree_g1_depth_klavier_frozen_latent_runner_cfg,
   unitree_g1_depth_klavier_visibility_constrained_runner_cfg,
@@ -59,6 +60,10 @@ DEPTH_KLAVIER_FACTORIAL_PUSH_ON_NO_SYM_TASK_ID = (
 DEPTH_KLAVIER_FACTORIAL_PUSH_ON_SYM_TASK_ID = (
   "Mjlab-Velocity-Football-Depth-KlavierTeacher-PushCurrOn-"
   "FrozenMLP-Sym-LatentDistillation-Flat-Unitree-G1"
+)
+DEPTH_KLAVIER_E1_STAGE2_TASK_ID = (
+  "Mjlab-Velocity-Football-Depth-KlavierTeacher-PushCurrOff-"
+  "ConstrainedLastMLP-NoSym-LatentDistillation-Flat-Unitree-G1"
 )
 
 
@@ -156,4 +161,12 @@ _register_frozen_factorial_task(
   DEPTH_KLAVIER_FACTORIAL_PUSH_ON_SYM_TASK_ID,
   push_curriculum=True,
   mirror_loss=True,
+)
+
+register_mjlab_task(
+  task_id=DEPTH_KLAVIER_E1_STAGE2_TASK_ID,
+  env_cfg=unitree_g1_depth_klavier_no_push_curriculum_flat_env_cfg(),
+  play_env_cfg=unitree_g1_depth_klavier_no_push_curriculum_flat_env_cfg(play=True),
+  rl_cfg=unitree_g1_depth_klavier_e1_stage2_runner_cfg(),
+  runner_cls=DepthTeacherDistillationRunner,
 )

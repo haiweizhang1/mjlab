@@ -389,6 +389,20 @@ def unitree_g1_depth_klavier_constrained_latent_runner_cfg() -> (
   return cfg
 
 
+def unitree_g1_depth_klavier_e1_stage2_runner_cfg() -> (
+  ConstrainedLatentDistillationRunnerCfg
+):
+  """E1 continuation: open only the last control-MLP layer for another 30k."""
+  cfg = unitree_g1_depth_klavier_constrained_latent_runner_cfg()
+  cfg.max_iterations = 30_000
+  cfg.save_interval = 1_000
+  cfg.run_name = (
+    "E1_PushCurrOff_ConstrainedLastMLP_NoSym_Mixed030_"
+    "Teacher47000_seed42_stage2_add30k_wandb"
+  )
+  return cfg
+
+
 def unitree_g1_depth_klavier_visibility_constrained_runner_cfg() -> (
   ConstrainedLatentDistillationRunnerCfg
 ):

@@ -178,3 +178,34 @@ def unitree_g1_klavier_ball_temporal_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
   cfg.run_name = "schemeA_ballcnn64_longdropout10_from_walk20000_seed42_50k_wandb"
   cfg.upload_model = False
   return cfg
+
+
+def unitree_g1_klavier_legacy512_walk_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
+  """Old-width Walk baseline used to initialize the controlled Teacher pair."""
+  cfg = unitree_g1_ppo_runner_cfg()
+  cfg.actor.hidden_dims = (512, 256, 128)
+  cfg.critic.hidden_dims = (512, 256, 128)
+  cfg.algorithm.entropy_coef = 0.01
+  cfg.algorithm.symmetry_cfg = None
+  cfg.experiment_name = "g1_velocity_walk_klavier_legacy512"
+  cfg.save_interval = 1000
+  cfg.max_iterations = 20_001
+  cfg.run_name = "KlavierLegacy512_LegacyPush_NoSym_seed42_20k_wandb"
+  cfg.upload_model = False
+  return cfg
+
+
+def unitree_g1_klavier_legacy512_ball_temporal_ppo_runner_cfg() -> (
+  RslRlOnPolicyRunnerCfg
+):
+  """512-256-128 football Teacher shared by the 0 cm / 5 cm noise pair."""
+  cfg = unitree_g1_factorial_ppo_runner_cfg(use_b1_history=True)
+  cfg.actor.hidden_dims = (512, 256, 128)
+  cfg.critic.hidden_dims = (512, 256, 128)
+  cfg.algorithm.entropy_coef = 0.01
+  cfg.algorithm.symmetry_cfg = None
+  cfg.experiment_name = "g1_velocity_football_klavier_legacy512_ball_temporal"
+  cfg.save_interval = 1000
+  cfg.max_iterations = 50_001
+  cfg.upload_model = False
+  return cfg

@@ -7,6 +7,9 @@ import pytest
 from mjlab.tasks.registry import list_tasks, load_env_cfg, load_rl_cfg, load_runner_cls
 from mjlab.tasks.velocity_football.config.g1 import (
   BASE_TASK_ID,
+  KLAVIER_LEGACY512_TEACHER_NOISE0_TASK_ID,
+  KLAVIER_LEGACY512_TEACHER_NOISE5CM_TASK_ID,
+  KLAVIER_LEGACY512_WALK_TASK_ID,
   KLAVIER_TEACHER_TASK_ID,
   KLAVIER_WALK_TASK_ID,
   TEACHER_BASELINE_TASK_ID,
@@ -22,13 +25,22 @@ def test_only_expected_coordinate_football_tasks_are_registered() -> None:
   }
   assert task_ids == {
     BASE_TASK_ID,
+    KLAVIER_LEGACY512_TEACHER_NOISE0_TASK_ID,
+    KLAVIER_LEGACY512_TEACHER_NOISE5CM_TASK_ID,
     KLAVIER_TEACHER_TASK_ID,
     TEACHER_BASELINE_TASK_ID,
   }
 
 
 @pytest.mark.parametrize(
-  "task_id", (BASE_TASK_ID, KLAVIER_TEACHER_TASK_ID, TEACHER_BASELINE_TASK_ID)
+  "task_id",
+  (
+    BASE_TASK_ID,
+    KLAVIER_TEACHER_TASK_ID,
+    KLAVIER_LEGACY512_TEACHER_NOISE0_TASK_ID,
+    KLAVIER_LEGACY512_TEACHER_NOISE5CM_TASK_ID,
+    TEACHER_BASELINE_TASK_ID,
+  ),
 )
 def test_active_coordinate_tasks_load(task_id: str) -> None:
   training_cfg = load_env_cfg(task_id)
@@ -113,3 +125,58 @@ def test_klavier_teacher_walk_transfer_and_symmetry_contract() -> None:
     "mirror_loss_coeff": 1.0,
   }
   assert runner_cfg.max_iterations == 50_001
+
+
+def test_klavier_legacy512_walk_contract() -> None:
+  cfg = load_env_cfg(KLAVIER_LEGACY512_WALK_TASK_ID)
+  runner_cfg = cast(Any, load_rl_cfg(KLAVIER_LEGACY512_WALK_TASK_ID))
+  push = cfg.events["push_robot"]
+
+  assert "push_velocity_levels" not in cfg.curriculum
+  assert push.interval_range_s == (5.0, 6.0)
+  assert push.params["velocity_range"] == {
+    "x": (-0.5, 0.5),
+    "y": (-0.3, 0.3),
+    "z": (-0.2, 0.2),
+    "roll": (-0.1, 0.1),
+    "pitch": (-0.1, 0.1),
+    "yaw": (-0.2, 0.2),
+  }
+  assert runner_cfg.actor.hidden_dims == (512, 256, 128)
+  assert runner_cfg.critic.hidden_dims == (512, 256, 128)
+  assert runner_cfg.algorithm.symmetry_cfg is None
+  assert runner_cfg.max_iterations == 20_001
+  assert runner_cfg.save_interval == 1_000
+
+
+@pytest.mark.parametrize(
+  ("task_id", "expected_noise"),
+  (
+    (KLAVIER_LEGACY512_TEACHER_NOISE0_TASK_ID, 0.0),
+    (KLAVIER_LEGACY512_TEACHER_NOISE5CM_TASK_ID, 0.05),
+  ),
+)
+def test_klavier_legacy512_teacher_pair_contract(
+  task_id: str, expected_noise: float
+) -> None:
+  cfg = load_env_cfg(task_id)
+  play_cfg = load_env_cfg(task_id, play=True)
+  runner_cfg = cast(Any, load_rl_cfg(task_id))
+  push = cfg.events["push_robot"]
+  ball = cfg.observations["actor_history"].terms["ball_features_b"]
+  play_ball = play_cfg.observations["actor_history"].terms["ball_features_b"]
+
+  assert "push_velocity_levels" not in cfg.curriculum
+  assert push.interval_range_s == (5.0, 6.0)
+  assert push.params["velocity_range"]["x"] == (-0.5, 0.5)
+  assert ball.params["frame_noise_range"] == pytest.approx(expected_noise)
+  assert play_ball.params["frame_noise_range"] == pytest.approx(0.0)
+  assert ball.params["bias_range"] == pytest.approx(0.0)
+  assert ball.params["dropout_probability"] == pytest.approx(0.0)
+  assert (ball.delay_min_lag, ball.delay_max_lag) == (0, 0)
+  assert ball.noise is None
+  assert runner_cfg.actor.hidden_dims == (512, 256, 128)
+  assert runner_cfg.critic.hidden_dims == (512, 256, 128)
+  assert runner_cfg.algorithm.symmetry_cfg is None
+  assert runner_cfg.max_iterations == 50_001
+  assert runner_cfg.save_interval == 1_000

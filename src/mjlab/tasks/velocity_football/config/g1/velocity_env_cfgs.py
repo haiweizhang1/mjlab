@@ -543,6 +543,28 @@ def unitree_g1_klavier_replica_flat_env_cfg(
   return cfg
 
 
+def unitree_g1_klavier_legacy512_walk_flat_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """Klavier Walk with the legacy fixed push distribution and no push curriculum."""
+  cfg = unitree_g1_klavier_replica_flat_env_cfg(play=play)
+  # The 2026-07-23 Walk used only this fixed 5--6 s interval push. It did not
+  # increase the range through a push curriculum.
+  cfg.curriculum.pop("push_velocity_levels", None)
+  if "push_robot" in cfg.events:
+    push = cfg.events["push_robot"]
+    push.interval_range_s = (5.0, 6.0)
+    push.params["velocity_range"] = {
+      "x": (-0.5, 0.5),
+      "y": (-0.3, 0.3),
+      "z": (-0.2, 0.2),
+      "roll": (-0.1, 0.1),
+      "pitch": (-0.1, 0.1),
+      "yaw": (-0.2, 0.2),
+    }
+  return cfg
+
+
 def unitree_g1_current_velocity_pretrain_flat_env_cfg(
   play: bool = False,
 ) -> ManagerBasedRlEnvCfg:

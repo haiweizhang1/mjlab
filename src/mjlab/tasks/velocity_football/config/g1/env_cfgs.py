@@ -710,6 +710,53 @@ def unitree_g1_klavier_ball_temporal_flat_env_cfg(
   return cfg
 
 
+def unitree_g1_klavier_legacy512_ball_temporal_flat_env_cfg(
+  *,
+  ball_position_noise_meters: float,
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """Legacy-width Klavier Teacher with one controlled ball-noise variable."""
+  if ball_position_noise_meters < 0.0:
+    raise ValueError("ball_position_noise_meters must be non-negative")
+  cfg = unitree_g1_klavier_ball_temporal_flat_env_cfg(play=play)
+
+  # Both comparison cells retain the legacy fixed interval push but never
+  # unlock a larger push range.
+  cfg.curriculum.pop("push_velocity_levels", None)
+  if "push_robot" in cfg.events:
+    push = cfg.events["push_robot"]
+    push.interval_range_s = (5.0, 6.0)
+    push.params["velocity_range"] = {
+      "x": (-0.5, 0.5),
+      "y": (-0.3, 0.3),
+      "z": (-0.2, 0.2),
+      "roll": (-0.1, 0.1),
+      "pitch": (-0.1, 0.1),
+      "yaw": (-0.2, 0.2),
+    }
+
+  # Remove long dropout, latency, fixed bias, and generic independent noise.
+  # The 5 cm cell adds only a shared per-control-step XY position error, so
+  # ball XY and both ball-to-foot vectors remain geometrically consistent.
+  ball_features = cfg.observations["actor_history"].terms["ball_features_b"]
+  ball_features.params.update(
+    {
+      "bias_range": 0.0,
+      "frame_noise_range": 0.0 if play else ball_position_noise_meters,
+      "dropout_probability": 0.0,
+      "episode_dropout_probability": 0.0,
+      "transition_dropout_probability": 0.0,
+      "transition_dropout_until_end_probability": 0.0,
+    }
+  )
+  ball_features.noise = None
+  ball_features.delay_min_lag = 0
+  ball_features.delay_max_lag = 0
+  ball_features.delay_hold_prob = 0.0
+  cfg.terminations["ball_out_of_control"].params["ignore_when_sensor_hidden"] = False
+  return cfg
+
+
 def _align_isaaclab_actor_observation_randomization(
   cfg: ManagerBasedRlEnvCfg,
 ) -> None:

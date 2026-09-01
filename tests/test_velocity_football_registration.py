@@ -7,6 +7,8 @@ import pytest
 from mjlab.tasks.registry import list_tasks, load_env_cfg, load_rl_cfg, load_runner_cls
 from mjlab.tasks.velocity_football.config.g1 import (
   BASE_TASK_ID,
+  KLAVIER_LEGACY512_TEACHER_LEGACY_REWARDS_NOISE0_TASK_ID,
+  KLAVIER_LEGACY512_TEACHER_LEGACY_REWARDS_NOISE5CM_TASK_ID,
   KLAVIER_LEGACY512_TEACHER_NOISE0_TASK_ID,
   KLAVIER_LEGACY512_TEACHER_NOISE5CM_TASK_ID,
   KLAVIER_LEGACY512_WALK_TASK_ID,
@@ -26,6 +28,8 @@ def test_only_expected_coordinate_football_tasks_are_registered() -> None:
   }
   assert task_ids == {
     BASE_TASK_ID,
+    KLAVIER_LEGACY512_TEACHER_LEGACY_REWARDS_NOISE0_TASK_ID,
+    KLAVIER_LEGACY512_TEACHER_LEGACY_REWARDS_NOISE5CM_TASK_ID,
     KLAVIER_LEGACY512_TEACHER_NOISE0_TASK_ID,
     KLAVIER_LEGACY512_TEACHER_NOISE5CM_TASK_ID,
     KLAVIER_TEACHER_TASK_ID,
@@ -38,6 +42,8 @@ def test_only_expected_coordinate_football_tasks_are_registered() -> None:
   (
     BASE_TASK_ID,
     KLAVIER_TEACHER_TASK_ID,
+    KLAVIER_LEGACY512_TEACHER_LEGACY_REWARDS_NOISE0_TASK_ID,
+    KLAVIER_LEGACY512_TEACHER_LEGACY_REWARDS_NOISE5CM_TASK_ID,
     KLAVIER_LEGACY512_TEACHER_NOISE0_TASK_ID,
     KLAVIER_LEGACY512_TEACHER_NOISE5CM_TASK_ID,
     TEACHER_BASELINE_TASK_ID,
@@ -202,3 +208,34 @@ def test_klavier_legacy512_teacher_pair_contract(
   assert runner_cfg.algorithm.symmetry_cfg is None
   assert runner_cfg.max_iterations == 50_001
   assert runner_cfg.save_interval == 1_000
+
+
+@pytest.mark.parametrize(
+  ("task_id", "expected_noise"),
+  (
+    (KLAVIER_LEGACY512_TEACHER_LEGACY_REWARDS_NOISE0_TASK_ID, 0.0),
+    (KLAVIER_LEGACY512_TEACHER_LEGACY_REWARDS_NOISE5CM_TASK_ID, 0.05),
+  ),
+)
+def test_klavier_legacy512_legacy_rewards_teacher_pair_contract(
+  task_id: str, expected_noise: float
+) -> None:
+  cfg = load_env_cfg(task_id)
+  runner_cfg = cast(Any, load_rl_cfg(task_id))
+  envelope = cfg.rewards["command_velocity_envelope"]
+  action_acc = cfg.rewards["action_acc_l2"]
+  ball = cfg.observations["actor_history"].terms["ball_features_b"]
+
+  assert envelope.weight == pytest.approx(-1.0)
+  assert envelope.params == {
+    "command_name": "twist",
+    "min_tolerance_x": 0.10,
+    "min_tolerance_y": 0.10,
+    "min_tolerance_yaw": 0.15,
+    "relative_tolerance": 0.30,
+  }
+  assert action_acc.weight == pytest.approx(-0.1)
+  assert ball.params["frame_noise_range"] == pytest.approx(expected_noise)
+  assert "push_velocity_levels" not in cfg.curriculum
+  assert runner_cfg.actor.hidden_dims == (512, 256, 128)
+  assert runner_cfg.algorithm.symmetry_cfg is None

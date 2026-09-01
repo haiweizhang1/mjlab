@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -ne 1 ]]; then
-  echo "Usage: $0 {noise0|noise5cm}" >&2
+  echo "Usage: $0 {noise0|noise5cm|legacy_noise0|legacy_noise5cm}" >&2
   exit 2
 fi
 
@@ -20,8 +20,16 @@ case "$variant" in
     task_id="Mjlab-Velocity-Football-KlavierReplica-Legacy512-NoPushCurr-BallNoise5cm-BallTemporal-Flat-Unitree-G1"
     run_name="KlavierLegacy512_NoPushCurr_BallNoise5cm_FromWalk20k_seed42_50k_wandb"
     ;;
+  legacy_noise0)
+    task_id="Mjlab-Velocity-Football-KlavierReplica-Legacy512-NoPushCurr-LegacyRewards-BallNoise0-BallTemporal-Flat-Unitree-G1"
+    run_name="KlavierLegacy512_NoPushCurr_Envelope30_ActionAcc01_BallNoise0cm_FromWalk20k_seed42_50k_wandb"
+    ;;
+  legacy_noise5cm)
+    task_id="Mjlab-Velocity-Football-KlavierReplica-Legacy512-NoPushCurr-LegacyRewards-BallNoise5cm-BallTemporal-Flat-Unitree-G1"
+    run_name="KlavierLegacy512_NoPushCurr_Envelope30_ActionAcc01_BallNoise5cm_FromWalk20k_seed42_50k_wandb"
+    ;;
   *)
-    echo "ERROR: unknown variant '$variant'; expected noise0 or noise5cm" >&2
+    echo "ERROR: unknown variant '$variant'" >&2
     exit 2
     ;;
 esac

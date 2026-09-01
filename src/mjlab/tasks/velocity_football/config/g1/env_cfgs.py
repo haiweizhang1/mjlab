@@ -713,6 +713,7 @@ def unitree_g1_klavier_ball_temporal_flat_env_cfg(
 def unitree_g1_klavier_legacy512_ball_temporal_flat_env_cfg(
   *,
   ball_position_noise_meters: float,
+  legacy_smoothness_rewards: bool = False,
   play: bool = False,
 ) -> ManagerBasedRlEnvCfg:
   """Legacy-width Klavier Teacher with one controlled ball-noise variable."""
@@ -754,6 +755,23 @@ def unitree_g1_klavier_legacy512_ball_temporal_flat_env_cfg(
   ball_features.delay_max_lag = 0
   ball_features.delay_hold_prob = 0.0
   cfg.terminations["ball_out_of_control"].params["ignore_when_sensor_hidden"] = False
+
+  if legacy_smoothness_rewards:
+    cfg.rewards["command_velocity_envelope"] = RewardTermCfg(
+      func=command_velocity_envelope_l2,
+      weight=-1.0,
+      params={
+        "command_name": "twist",
+        "min_tolerance_x": 0.10,
+        "min_tolerance_y": 0.10,
+        "min_tolerance_yaw": 0.15,
+        "relative_tolerance": 0.30,
+      },
+    )
+    cfg.rewards["action_acc_l2"] = RewardTermCfg(
+      func=mdp.action_acc_l2,
+      weight=-0.1,
+    )
   return cfg
 
 

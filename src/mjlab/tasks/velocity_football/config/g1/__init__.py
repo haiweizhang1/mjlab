@@ -47,6 +47,14 @@ KLAVIER_LEGACY512_TEACHER_NOISE5CM_TASK_ID = (
   "Mjlab-Velocity-Football-KlavierReplica-Legacy512-NoPushCurr-"
   "BallNoise5cm-BallTemporal-Flat-Unitree-G1"
 )
+KLAVIER_LEGACY512_TEACHER_LEGACY_REWARDS_NOISE0_TASK_ID = (
+  "Mjlab-Velocity-Football-KlavierReplica-Legacy512-NoPushCurr-"
+  "LegacyRewards-BallNoise0-BallTemporal-Flat-Unitree-G1"
+)
+KLAVIER_LEGACY512_TEACHER_LEGACY_REWARDS_NOISE5CM_TASK_ID = (
+  "Mjlab-Velocity-Football-KlavierReplica-Legacy512-NoPushCurr-"
+  "LegacyRewards-BallNoise5cm-BallTemporal-Flat-Unitree-G1"
+)
 
 
 register_mjlab_task(
@@ -90,20 +98,28 @@ register_mjlab_task(
 )
 
 
-def _register_legacy512_teacher(task_id: str, noise_meters: float) -> None:
+def _register_legacy512_teacher(
+  task_id: str,
+  noise_meters: float,
+  *,
+  legacy_smoothness_rewards: bool = False,
+) -> None:
   runner_cfg = unitree_g1_klavier_legacy512_ball_temporal_ppo_runner_cfg()
   noise_cm = int(round(noise_meters * 100.0))
+  reward_label = "Envelope30_ActionAcc01_" if legacy_smoothness_rewards else ""
   runner_cfg.run_name = (
-    f"KlavierLegacy512_NoPushCurr_BallNoise{noise_cm}cm_"
+    f"KlavierLegacy512_NoPushCurr_{reward_label}BallNoise{noise_cm}cm_"
     "FromWalk20k_seed42_50k_wandb"
   )
   register_mjlab_task(
     task_id=task_id,
     env_cfg=unitree_g1_klavier_legacy512_ball_temporal_flat_env_cfg(
-      ball_position_noise_meters=noise_meters
+      ball_position_noise_meters=noise_meters,
+      legacy_smoothness_rewards=legacy_smoothness_rewards,
     ),
     play_env_cfg=unitree_g1_klavier_legacy512_ball_temporal_flat_env_cfg(
       ball_position_noise_meters=noise_meters,
+      legacy_smoothness_rewards=legacy_smoothness_rewards,
       play=True,
     ),
     rl_cfg=runner_cfg,
@@ -113,6 +129,16 @@ def _register_legacy512_teacher(task_id: str, noise_meters: float) -> None:
 
 _register_legacy512_teacher(KLAVIER_LEGACY512_TEACHER_NOISE0_TASK_ID, 0.0)
 _register_legacy512_teacher(KLAVIER_LEGACY512_TEACHER_NOISE5CM_TASK_ID, 0.05)
+_register_legacy512_teacher(
+  KLAVIER_LEGACY512_TEACHER_LEGACY_REWARDS_NOISE0_TASK_ID,
+  0.0,
+  legacy_smoothness_rewards=True,
+)
+_register_legacy512_teacher(
+  KLAVIER_LEGACY512_TEACHER_LEGACY_REWARDS_NOISE5CM_TASK_ID,
+  0.05,
+  legacy_smoothness_rewards=True,
+)
 
 register_mjlab_task(
   task_id=TEACHER_BASELINE_TASK_ID,

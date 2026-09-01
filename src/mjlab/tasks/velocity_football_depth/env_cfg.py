@@ -640,6 +640,50 @@ def unitree_g1_depth_klavier_no_push_curriculum_flat_env_cfg(
   return cfg
 
 
+def unitree_g1_depth_klavier_legacy512_noise0_stage1_flat_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """Depth Stage 1 matched to the Legacy512 Noise0 Teacher distribution."""
+  cfg = unitree_g1_depth_klavier_mount_range_visual_dr_flat_env_cfg(play=play)
+  cfg.curriculum.pop("push_velocity_levels", None)
+
+  if "push_robot" in cfg.events:
+    push = cfg.events["push_robot"]
+    push.interval_range_s = (5.0, 6.0)
+    push.params["velocity_range"] = {
+      "x": (-0.5, 0.5),
+      "y": (-0.3, 0.3),
+      "z": (-0.2, 0.2),
+      "roll": (-0.1, 0.1),
+      "pitch": (-0.1, 0.1),
+      "yaw": (-0.2, 0.2),
+    }
+
+  ball_features = cfg.observations["actor_history"].terms["ball_features_b"]
+  ball_features.params.update(
+    {
+      "bias_range": 0.0,
+      "frame_noise_range": 0.0,
+      "dropout_probability": 0.0,
+      "episode_dropout_probability": 0.0,
+      "transition_dropout_probability": 0.0,
+      "transition_dropout_until_end_probability": 0.0,
+    }
+  )
+  ball_features.noise = None
+  ball_features.delay_min_lag = 0
+  ball_features.delay_max_lag = 0
+  ball_features.delay_hold_prob = 0.0
+
+  depth = cfg.observations["depth"].terms["image"]
+  depth.delay_min_lag = 0
+  depth.delay_max_lag = 0
+  depth.delay_hold_prob = 0.0
+  depth.delay_shared_key = ball_features.delay_shared_key
+  cfg.terminations["ball_out_of_control"].params["ignore_when_sensor_hidden"] = False
+  return cfg
+
+
 def unitree_g1_depth_klavier_visibility_supervised_flat_env_cfg(
   play: bool = False,
 ) -> ManagerBasedRlEnvCfg:

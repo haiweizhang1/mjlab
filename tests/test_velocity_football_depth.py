@@ -18,6 +18,7 @@ from mjlab.tasks.velocity_football_depth import (
   DEPTH_KLAVIER_FACTORIAL_PUSH_OFF_SYM_TASK_ID,
   DEPTH_KLAVIER_FACTORIAL_PUSH_ON_NO_SYM_TASK_ID,
   DEPTH_KLAVIER_FACTORIAL_PUSH_ON_SYM_TASK_ID,
+  DEPTH_KLAVIER_LEGACY512_NOISE0_STAGE1_TASK_ID,
   DEPTH_KLAVIER_STAGE1_TASK_ID,
   DEPTH_KLAVIER_STAGE2_TASK_ID,
   DEPTH_KLAVIER_VISIBILITY_STAGE2_TASK_ID,
@@ -53,6 +54,7 @@ def test_only_expected_depth_football_tasks_are_registered() -> None:
     DEPTH_KLAVIER_FACTORIAL_PUSH_ON_NO_SYM_TASK_ID,
     DEPTH_KLAVIER_FACTORIAL_PUSH_ON_SYM_TASK_ID,
     DEPTH_KLAVIER_E1_STAGE2_TASK_ID,
+    DEPTH_KLAVIER_LEGACY512_NOISE0_STAGE1_TASK_ID,
   }
 
 
@@ -70,6 +72,7 @@ def test_only_expected_depth_football_tasks_are_registered() -> None:
     DEPTH_KLAVIER_FACTORIAL_PUSH_ON_NO_SYM_TASK_ID,
     DEPTH_KLAVIER_FACTORIAL_PUSH_ON_SYM_TASK_ID,
     DEPTH_KLAVIER_E1_STAGE2_TASK_ID,
+    DEPTH_KLAVIER_LEGACY512_NOISE0_STAGE1_TASK_ID,
   ),
 )
 def test_active_depth_tasks_expose_temporal_teacher_contract(task_id: str) -> None:
@@ -149,6 +152,34 @@ def test_klavier_stage_one_depth_contract() -> None:
   assert runner_cfg.algorithm.class_name.endswith("FrozenLatentDistillation")
   assert runner_cfg.algorithm.rollout_policy == "teacher"
   assert runner_cfg.algorithm.latent_loss_coef == pytest.approx(0.1)
+
+
+def test_legacy512_noise0_stage_one_depth_contract() -> None:
+  cfg = load_env_cfg(DEPTH_KLAVIER_LEGACY512_NOISE0_STAGE1_TASK_ID)
+  runner_cfg = cast(Any, load_rl_cfg(DEPTH_KLAVIER_LEGACY512_NOISE0_STAGE1_TASK_ID))
+  ball = cfg.observations["actor_history"].terms["ball_features_b"]
+  depth = cfg.observations["depth"].terms["image"]
+  push = cfg.events["push_robot"]
+
+  assert "push_velocity_levels" not in cfg.curriculum
+  assert push.interval_range_s == (5.0, 6.0)
+  assert push.params["velocity_range"]["x"] == (-0.5, 0.5)
+  assert push.params["velocity_range"]["yaw"] == (-0.2, 0.2)
+  assert ball.params["frame_noise_range"] == pytest.approx(0.0)
+  assert ball.params["transition_dropout_probability"] == pytest.approx(0.0)
+  assert (ball.delay_min_lag, ball.delay_max_lag) == (0, 0)
+  assert (depth.delay_min_lag, depth.delay_max_lag) == (0, 0)
+  assert ball.delay_shared_key == depth.delay_shared_key
+  assert runner_cfg.teacher.hidden_dims == (512, 256, 128)
+  assert runner_cfg.student.hidden_dims == (512, 256, 128)
+  assert runner_cfg.student.cnn_cfg["freeze_coordinate_actor"] is True
+  assert runner_cfg.student.cnn_cfg["train_mlp_last_layer_only"] is False
+  assert runner_cfg.algorithm.class_name.endswith("FrozenLatentDistillation")
+  assert runner_cfg.algorithm.rollout_policy == "teacher"
+  assert runner_cfg.algorithm.latent_loss_coef == pytest.approx(0.1)
+  assert runner_cfg.algorithm.mirror_loss_coef == pytest.approx(0.0)
+  assert runner_cfg.max_iterations == 10_000
+  assert runner_cfg.save_interval == 1_000
 
 
 def test_klavier_stage_two_depth_contract() -> None:

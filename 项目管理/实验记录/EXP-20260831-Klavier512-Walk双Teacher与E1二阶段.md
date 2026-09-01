@@ -91,3 +91,20 @@ SOURCE_RUN=<E1目录名> SOURCE_CHECKPOINT=model_27000.pt \
 
 注意：该脚本使用恢复训练，不能改成 `--pretrained-checkpoint`，否则会丢失 E1
 Student、Teacher 和已训练迭代状态的完整继承关系。
+
+## Noise0 Teacher 50k续训与Legacy512一阶段蒸馏
+
+从 Noise0 Teacher `model_50000.pt` 分出两条可并行运行的链路：
+
+1. PPO使用 `resume` 保留优化器与课程状态，再训练30k，最终强制保存预计为
+   `model_79999.pt`。
+2. 固定同一个 `model_50000.pt`，从0训练Depth Student第一阶段10k。
+
+Legacy512第一阶段严格匹配Teacher：MLP `512/256/128`、Noise0、无球观测延迟、
+无推力课程、固定旧推力、无对称损失。Teacher rollout为100%，控制MLP完全冻结，
+只训练深度CNN；损失为Huber动作损失加`0.1` latent loss。
+
+```bash
+bash scripts/resume_klavier_legacy512_noise0_teacher50k_to80k.sh
+bash scripts/run_depth_student_legacy512_noise0_stage1_10k.sh
+```

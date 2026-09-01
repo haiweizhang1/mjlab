@@ -330,6 +330,22 @@ def unitree_g1_depth_klavier_frozen_latent_runner_cfg() -> (
   return cfg
 
 
+def unitree_g1_depth_klavier_legacy512_noise0_stage1_runner_cfg() -> (
+  TemporalTeacherDistillationRunnerCfg
+):
+  """Frozen-backbone Stage 1 for the 512-256-128 Noise0 Teacher."""
+  cfg = unitree_g1_depth_klavier_frozen_latent_runner_cfg()
+  cfg.teacher.hidden_dims = (512, 256, 128)
+  cfg.student.hidden_dims = (512, 256, 128)
+  cfg.max_iterations = 10_000
+  cfg.save_interval = 1_000
+  cfg.run_name = (
+    "DepthStudent_KlavierLegacy512_Noise0Teacher50000_FrozenMLP_"
+    "TeacherRollout_Latent01_NoDelay_MountRange025_seed42_10k_wandb"
+  )
+  return cfg
+
+
 def unitree_g1_depth_klavier_frozen_latent_symmetric_runner_cfg() -> (
   TemporalTeacherDistillationRunnerCfg
 ):

@@ -346,6 +346,24 @@ def unitree_g1_depth_klavier_legacy512_noise0_stage1_runner_cfg() -> (
   return cfg
 
 
+def unitree_g1_depth_klavier_legacy512_noise0_action_only_stage1_runner_cfg() -> (
+  TemporalTeacherDistillationRunnerCfg
+):
+  """Legacy-style Stage 1: frozen backbone and pure action imitation."""
+  cfg = unitree_g1_depth_klavier_legacy512_noise0_stage1_runner_cfg()
+  cfg.algorithm = TeacherRolloutDistillationAlgorithmCfg(
+    rollout_policy="teacher",
+    student_rollout_warmup_updates=1_000,
+    student_rollout_ramp_updates=3_000,
+    student_rollout_final_probability=1.0,
+  )
+  cfg.run_name = (
+    "DepthStudent_KlavierLegacy512_Noise0Teacher50000_FrozenMLP_"
+    "TeacherRollout_ActionHuberOnly_NoDelay_MountRange025_seed42_10k_wandb"
+  )
+  return cfg
+
+
 def unitree_g1_depth_klavier_frozen_latent_symmetric_runner_cfg() -> (
   TemporalTeacherDistillationRunnerCfg
 ):

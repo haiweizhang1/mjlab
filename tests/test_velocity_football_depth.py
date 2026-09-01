@@ -18,6 +18,7 @@ from mjlab.tasks.velocity_football_depth import (
   DEPTH_KLAVIER_FACTORIAL_PUSH_OFF_SYM_TASK_ID,
   DEPTH_KLAVIER_FACTORIAL_PUSH_ON_NO_SYM_TASK_ID,
   DEPTH_KLAVIER_FACTORIAL_PUSH_ON_SYM_TASK_ID,
+  DEPTH_KLAVIER_LEGACY512_NOISE0_ACTION_ONLY_STAGE1_TASK_ID,
   DEPTH_KLAVIER_LEGACY512_NOISE0_STAGE1_TASK_ID,
   DEPTH_KLAVIER_STAGE1_TASK_ID,
   DEPTH_KLAVIER_STAGE2_TASK_ID,
@@ -55,6 +56,7 @@ def test_only_expected_depth_football_tasks_are_registered() -> None:
     DEPTH_KLAVIER_FACTORIAL_PUSH_ON_SYM_TASK_ID,
     DEPTH_KLAVIER_E1_STAGE2_TASK_ID,
     DEPTH_KLAVIER_LEGACY512_NOISE0_STAGE1_TASK_ID,
+    DEPTH_KLAVIER_LEGACY512_NOISE0_ACTION_ONLY_STAGE1_TASK_ID,
   }
 
 
@@ -73,6 +75,7 @@ def test_only_expected_depth_football_tasks_are_registered() -> None:
     DEPTH_KLAVIER_FACTORIAL_PUSH_ON_SYM_TASK_ID,
     DEPTH_KLAVIER_E1_STAGE2_TASK_ID,
     DEPTH_KLAVIER_LEGACY512_NOISE0_STAGE1_TASK_ID,
+    DEPTH_KLAVIER_LEGACY512_NOISE0_ACTION_ONLY_STAGE1_TASK_ID,
   ),
 )
 def test_active_depth_tasks_expose_temporal_teacher_contract(task_id: str) -> None:
@@ -178,6 +181,30 @@ def test_legacy512_noise0_stage_one_depth_contract() -> None:
   assert runner_cfg.algorithm.rollout_policy == "teacher"
   assert runner_cfg.algorithm.latent_loss_coef == pytest.approx(0.1)
   assert runner_cfg.algorithm.mirror_loss_coef == pytest.approx(0.0)
+  assert runner_cfg.max_iterations == 10_000
+  assert runner_cfg.save_interval == 1_000
+
+
+def test_legacy512_noise0_action_only_stage_one_depth_contract() -> None:
+  cfg = load_env_cfg(DEPTH_KLAVIER_LEGACY512_NOISE0_ACTION_ONLY_STAGE1_TASK_ID)
+  runner_cfg = cast(
+    Any, load_rl_cfg(DEPTH_KLAVIER_LEGACY512_NOISE0_ACTION_ONLY_STAGE1_TASK_ID)
+  )
+  ball = cfg.observations["actor_history"].terms["ball_features_b"]
+  depth = cfg.observations["depth"].terms["image"]
+
+  assert "push_velocity_levels" not in cfg.curriculum
+  assert (ball.delay_min_lag, ball.delay_max_lag) == (0, 0)
+  assert (depth.delay_min_lag, depth.delay_max_lag) == (0, 0)
+  assert runner_cfg.teacher.hidden_dims == (512, 256, 128)
+  assert runner_cfg.student.hidden_dims == (512, 256, 128)
+  assert runner_cfg.student.cnn_cfg["freeze_coordinate_actor"] is True
+  assert runner_cfg.student.cnn_cfg["train_mlp_last_layer_only"] is False
+  assert runner_cfg.algorithm.class_name.endswith("TeacherRolloutDistillation")
+  assert runner_cfg.algorithm.rollout_policy == "teacher"
+  assert runner_cfg.algorithm.loss_type == "huber"
+  assert not hasattr(runner_cfg.algorithm, "latent_loss_coef")
+  assert runner_cfg.algorithm.symmetry_cfg is None
   assert runner_cfg.max_iterations == 10_000
   assert runner_cfg.save_interval == 1_000
 

@@ -16,6 +16,7 @@ from .rl_cfg import (
   unitree_g1_depth_klavier_e1_stage2_runner_cfg,
   unitree_g1_depth_klavier_factorial_mixed_runner_cfg,
   unitree_g1_depth_klavier_frozen_latent_runner_cfg,
+  unitree_g1_depth_klavier_legacy512_noise0_action_only_stage1_runner_cfg,
   unitree_g1_depth_klavier_legacy512_noise0_stage1_runner_cfg,
   unitree_g1_depth_klavier_visibility_constrained_runner_cfg,
   unitree_g1_depth_temporal_calibrated_frozen_mlp_runner_cfg,
@@ -70,6 +71,10 @@ DEPTH_KLAVIER_E1_STAGE2_TASK_ID = (
 DEPTH_KLAVIER_LEGACY512_NOISE0_STAGE1_TASK_ID = (
   "Mjlab-Velocity-Football-Depth-KlavierLegacy512Noise0Teacher-"
   "PushCurrOff-FrozenMLP-NoSym-LatentDistillation-Flat-Unitree-G1"
+)
+DEPTH_KLAVIER_LEGACY512_NOISE0_ACTION_ONLY_STAGE1_TASK_ID = (
+  "Mjlab-Velocity-Football-Depth-KlavierLegacy512Noise0Teacher-"
+  "PushCurrOff-FrozenMLP-NoSym-ActionOnlyDistillation-Flat-Unitree-G1"
 )
 
 
@@ -184,5 +189,15 @@ register_mjlab_task(
     play=True
   ),
   rl_cfg=unitree_g1_depth_klavier_legacy512_noise0_stage1_runner_cfg(),
+  runner_cls=DepthTeacherDistillationRunner,
+)
+
+register_mjlab_task(
+  task_id=DEPTH_KLAVIER_LEGACY512_NOISE0_ACTION_ONLY_STAGE1_TASK_ID,
+  env_cfg=unitree_g1_depth_klavier_legacy512_noise0_stage1_flat_env_cfg(),
+  play_env_cfg=unitree_g1_depth_klavier_legacy512_noise0_stage1_flat_env_cfg(
+    play=True
+  ),
+  rl_cfg=unitree_g1_depth_klavier_legacy512_noise0_action_only_stage1_runner_cfg(),
   runner_cls=DepthTeacherDistillationRunner,
 )

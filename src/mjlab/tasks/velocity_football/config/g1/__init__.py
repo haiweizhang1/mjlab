@@ -15,11 +15,13 @@ from .rl_cfg import (
   unitree_g1_klavier_legacy512_ball_temporal_ppo_runner_cfg,
   unitree_g1_klavier_legacy512_walk_ppo_runner_cfg,
   unitree_g1_klavier_replica_ppo_runner_cfg,
+  unitree_g1_legacy_xml_legacy512_walk_ppo_runner_cfg,
   unitree_g1_ppo_runner_cfg,
 )
 from .velocity_env_cfgs import (
   unitree_g1_klavier_legacy512_walk_flat_env_cfg,
   unitree_g1_klavier_replica_flat_env_cfg,
+  unitree_g1_legacy_xml_legacy512_walk_flat_env_cfg,
 )
 
 BASE_TASK_ID = "Mjlab-Velocity-Football-Flat-Unitree-G1"
@@ -33,6 +35,9 @@ KLAVIER_TEACHER_TASK_ID = (
 )
 KLAVIER_LEGACY512_WALK_TASK_ID = (
   "Mjlab-Velocity-Walk-KlavierReplica-Legacy512-LegacyPush-Flat-Unitree-G1"
+)
+LEGACY_XML_LEGACY512_WALK_TASK_ID = (
+  "Mjlab-Velocity-Walk-LegacyXML-Legacy512-LegacyPush-Flat-Unitree-G1"
 )
 KLAVIER_LEGACY512_TEACHER_NOISE0_TASK_ID = (
   "Mjlab-Velocity-Football-KlavierReplica-Legacy512-NoPushCurr-"
@@ -73,6 +78,14 @@ register_mjlab_task(
   env_cfg=unitree_g1_klavier_legacy512_walk_flat_env_cfg(),
   play_env_cfg=unitree_g1_klavier_legacy512_walk_flat_env_cfg(play=True),
   rl_cfg=unitree_g1_klavier_legacy512_walk_ppo_runner_cfg(),
+  runner_cls=VelocityOnPolicyRunner,
+)
+
+register_mjlab_task(
+  task_id=LEGACY_XML_LEGACY512_WALK_TASK_ID,
+  env_cfg=unitree_g1_legacy_xml_legacy512_walk_flat_env_cfg(),
+  play_env_cfg=unitree_g1_legacy_xml_legacy512_walk_flat_env_cfg(play=True),
+  rl_cfg=unitree_g1_legacy_xml_legacy512_walk_ppo_runner_cfg(),
   runner_cls=VelocityOnPolicyRunner,
 )
 

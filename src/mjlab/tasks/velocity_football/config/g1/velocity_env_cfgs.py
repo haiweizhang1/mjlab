@@ -565,6 +565,16 @@ def unitree_g1_klavier_legacy512_walk_flat_env_cfg(
   return cfg
 
 
+def unitree_g1_legacy_xml_legacy512_walk_flat_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """Legacy512 Walk control cell using only the old standard G1 XML."""
+  cfg = unitree_g1_klavier_legacy512_walk_flat_env_cfg(play=play)
+  cfg.scene.entities["robot"] = get_g1_robot_cfg()
+  cfg.scene.entities["robot"].init_state = get_isaaclab_default_keyframe()
+  return cfg
+
+
 def unitree_g1_current_velocity_pretrain_flat_env_cfg(
   play: bool = False,
 ) -> ManagerBasedRlEnvCfg:

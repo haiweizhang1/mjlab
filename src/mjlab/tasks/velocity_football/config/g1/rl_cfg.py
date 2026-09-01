@@ -195,6 +195,14 @@ def unitree_g1_klavier_legacy512_walk_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg
   return cfg
 
 
+def unitree_g1_legacy_xml_legacy512_walk_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
+  """Legacy512 Walk comparison using the old standard G1 XML."""
+  cfg = unitree_g1_klavier_legacy512_walk_ppo_runner_cfg()
+  cfg.experiment_name = "g1_velocity_walk_legacy_xml_legacy512"
+  cfg.run_name = "LegacyXML_Legacy512_LegacyPush_NoSym_seed42_20k_wandb"
+  return cfg
+
+
 def unitree_g1_klavier_legacy512_ball_temporal_ppo_runner_cfg() -> (
   RslRlOnPolicyRunnerCfg
 ):

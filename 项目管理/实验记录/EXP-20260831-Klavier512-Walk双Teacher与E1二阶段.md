@@ -108,3 +108,14 @@ Legacy512第一阶段严格匹配Teacher：MLP `512/256/128`、Noise0、无球�
 bash scripts/resume_klavier_legacy512_noise0_teacher50k_to80k.sh
 bash scripts/run_depth_student_legacy512_noise0_stage1_10k.sh
 ```
+
+## 旧版标准G1 XML Walk单变量对照
+
+Task：`Mjlab-Velocity-Walk-LegacyXML-Legacy512-LegacyPush-Flat-Unitree-G1`。
+它相对Klavier Legacy512 Walk只将机器人模型从`get_klavier_spec`替换为旧版标准
+`get_spec`；MLP `512/256/128`、固定旧推力、无推力课程、无对称损失、seed42、
+20k训练和每1000保存均保持相同。
+
+```bash
+bash scripts/run_legacy_xml_legacy512_walk_seed42_20k.sh
+```

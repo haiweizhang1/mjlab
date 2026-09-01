@@ -12,6 +12,7 @@ from mjlab.tasks.velocity_football.config.g1 import (
   KLAVIER_LEGACY512_WALK_TASK_ID,
   KLAVIER_TEACHER_TASK_ID,
   KLAVIER_WALK_TASK_ID,
+  LEGACY_XML_LEGACY512_WALK_TASK_ID,
   TEACHER_BASELINE_TASK_ID,
 )
 from mjlab.tasks.velocity_football.rl import VelocityOnPolicyRunner
@@ -142,6 +143,27 @@ def test_klavier_legacy512_walk_contract() -> None:
     "pitch": (-0.1, 0.1),
     "yaw": (-0.2, 0.2),
   }
+  assert runner_cfg.actor.hidden_dims == (512, 256, 128)
+  assert runner_cfg.critic.hidden_dims == (512, 256, 128)
+  assert runner_cfg.algorithm.symmetry_cfg is None
+  assert runner_cfg.max_iterations == 20_001
+  assert runner_cfg.save_interval == 1_000
+
+
+def test_legacy_xml_legacy512_walk_is_an_xml_only_control() -> None:
+  old_xml_cfg = load_env_cfg(LEGACY_XML_LEGACY512_WALK_TASK_ID)
+  klavier_cfg = load_env_cfg(KLAVIER_LEGACY512_WALK_TASK_ID)
+  runner_cfg = cast(Any, load_rl_cfg(LEGACY_XML_LEGACY512_WALK_TASK_ID))
+  old_robot = old_xml_cfg.scene.entities["robot"]
+  klavier_robot = klavier_cfg.scene.entities["robot"]
+
+  assert old_robot.spec_fn.__name__ == "get_spec"
+  assert klavier_robot.spec_fn.__name__ == "get_klavier_spec"
+  assert old_xml_cfg.events["push_robot"].params == (
+    klavier_cfg.events["push_robot"].params
+  )
+  assert old_xml_cfg.events["push_robot"].interval_range_s == (5.0, 6.0)
+  assert "push_velocity_levels" not in old_xml_cfg.curriculum
   assert runner_cfg.actor.hidden_dims == (512, 256, 128)
   assert runner_cfg.critic.hidden_dims == (512, 256, 128)
   assert runner_cfg.algorithm.symmetry_cfg is None

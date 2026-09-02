@@ -377,6 +377,23 @@ def unitree_g1_depth_klavier_legacy_rewards_action_only_stage1_runner_cfg() -> (
   return cfg
 
 
+def unitree_g1_depth_klavier_legacy_rewards_stage2_runner_cfg() -> (
+  ConstrainedLatentDistillationRunnerCfg
+):
+  """Old-style Stage 2 for the smooth LegacyRewards Noise5 Teacher."""
+  cfg = unitree_g1_depth_klavier_constrained_latent_runner_cfg()
+  cfg.teacher.hidden_dims = (512, 256, 128)
+  cfg.student.hidden_dims = (512, 256, 128)
+  cfg.max_iterations = 10_000
+  cfg.save_interval = 1_000
+  cfg.run_name = (
+    "DepthStudent_KlavierLegacyRewardsNoise5Teacher25000_"
+    "ConstrainedLastMLP_Mixed030_Latent01_MLPAnchor001_"
+    "LegacyStage1DR_NoDelay_seed42_stage2_10k_wandb"
+  )
+  return cfg
+
+
 def unitree_g1_depth_klavier_frozen_latent_symmetric_runner_cfg() -> (
   TemporalTeacherDistillationRunnerCfg
 ):

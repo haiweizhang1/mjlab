@@ -364,6 +364,19 @@ def unitree_g1_depth_klavier_legacy512_noise0_action_only_stage1_runner_cfg() ->
   return cfg
 
 
+def unitree_g1_depth_klavier_legacy_rewards_action_only_stage1_runner_cfg() -> (
+  TemporalTeacherDistillationRunnerCfg
+):
+  """Old action-only Stage 1 for the smooth LegacyRewards Noise5 Teacher."""
+  cfg = unitree_g1_depth_klavier_legacy512_noise0_action_only_stage1_runner_cfg()
+  cfg.run_name = (
+    "DepthStudent_KlavierLegacyRewardsNoise5Teacher25000_FrozenMLP_"
+    "TeacherRollout_ActionHuberOnly_LegacyStage1DR_NoDelay_"
+    "MountRange025_seed42_10k_wandb"
+  )
+  return cfg
+
+
 def unitree_g1_depth_klavier_frozen_latent_symmetric_runner_cfg() -> (
   TemporalTeacherDistillationRunnerCfg
 ):

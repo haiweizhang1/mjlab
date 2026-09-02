@@ -684,6 +684,26 @@ def unitree_g1_depth_klavier_legacy512_noise0_stage1_flat_env_cfg(
   return cfg
 
 
+def unitree_g1_depth_klavier_legacy_rewards_stage1_flat_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """Old Stage-1 DR matched to the smooth LegacyRewards Klavier Teacher."""
+  cfg = unitree_g1_depth_klavier_legacy512_noise0_stage1_flat_env_cfg(play=play)
+
+  # The successful legacy depth Stage 1 randomized friction and base COM, but
+  # did not expose a frozen-backbone Student to these newer physical DR terms.
+  for event_name in (
+    "encoder_bias",
+    "base_mass",
+    "joint_default_pos",
+    "joint_friction",
+    "joint_armature",
+    "actuator_gains",
+  ):
+    cfg.events.pop(event_name, None)
+  return cfg
+
+
 def unitree_g1_depth_klavier_visibility_supervised_flat_env_cfg(
   play: bool = False,
 ) -> ManagerBasedRlEnvCfg:

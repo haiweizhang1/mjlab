@@ -5,7 +5,7 @@ from pathlib import Path
 import mujoco
 
 from mjlab import MJLAB_SRC_PATH
-from mjlab.actuator import BuiltinPositionActuatorCfg
+from mjlab.actuator import BuiltinPositionActuatorCfg, IdealPdActuatorCfg
 from mjlab.entity import EntityArticulationInfoCfg, EntityCfg
 from mjlab.utils.actuator import (
   ElectricActuator,
@@ -32,7 +32,7 @@ assert G1_XML.exists()
 assert G1_KLAVIER_XML.exists()
 
 
-def _get_spec(xml_path: Path) -> mujoco.MjSpec:
+def _get_spec(xml_path: Path, *, keep_xml_actuators: bool = False) -> mujoco.MjSpec:
   spec = mujoco.MjSpec.from_file(str(xml_path))
   if xml_path.name != "g1_29dof_football.xml":
     return spec
@@ -44,8 +44,9 @@ def _get_spec(xml_path: Path) -> mujoco.MjSpec:
 
   # MjLab adds its configured actuators below when building the Entity. Keeping
   # the XML motors would create 58 actuators for the same 29 joints.
-  for actuator in list(spec.actuators):
-    spec.delete(actuator)
+  if not keep_xml_actuators:
+    for actuator in list(spec.actuators):
+      spec.delete(actuator)
 
   spec.sensor("imu_gyro").name = "imu_ang_vel"
   spec.sensor("frame_vel").name = "imu_lin_vel"
@@ -85,6 +86,11 @@ def get_spec() -> mujoco.MjSpec:
 def get_klavier_spec() -> mujoco.MjSpec:
   """Load the copied Klavier G1 model while stripping its standalone scene."""
   return _get_spec(G1_KLAVIER_XML)
+
+
+def get_klavier_spec_keep_motors() -> mujoco.MjSpec:
+  """Klavier robot spec with XML ``<motor>`` actuators retained for deploy sim2sim."""
+  return _get_spec(G1_KLAVIER_XML, keep_xml_actuators=True)
 
 
 ##
@@ -342,6 +348,59 @@ def get_g1_klavier_robot_cfg() -> EntityCfg:
     collisions=(FULL_COLLISION,),
     spec_fn=get_klavier_spec,
     articulation=G1_ARTICULATION,
+  )
+
+
+def get_g1_klavier_robot_cfg_motors_only() -> EntityCfg:
+  """Klavier G1 with XML motors only (no BuiltinPositionActuator), for deploy PD sim2sim."""
+  return EntityCfg(
+    init_state=KNEES_BENT_KEYFRAME,
+    collisions=(FULL_COLLISION,),
+    spec_fn=get_klavier_spec_keep_motors,
+    articulation=EntityArticulationInfoCfg(
+      actuators=(),
+      soft_joint_pos_limit_factor=G1_ARTICULATION.soft_joint_pos_limit_factor,
+    ),
+  )
+
+
+def _builtin_position_to_ideal_pd(
+  cfg: BuiltinPositionActuatorCfg,
+) -> IdealPdActuatorCfg:
+  """Mirror training kp/kd/effort on explicit ``<motor>`` PD actuators."""
+  assert cfg.effort_limit is not None
+  return IdealPdActuatorCfg(
+    target_names_expr=cfg.target_names_expr,
+    stiffness=cfg.stiffness,
+    damping=cfg.damping,
+    effort_limit=cfg.effort_limit,
+    armature=cfg.armature,
+    frictionloss=cfg.frictionloss,
+    viscous_damping=cfg.viscous_damping,
+    transmission_type=cfg.transmission_type,
+    delay_min_lag=cfg.delay_min_lag,
+    delay_max_lag=cfg.delay_max_lag,
+    delay_hold_prob=cfg.delay_hold_prob,
+  )
+
+
+G1_KLAVIER_IDEAL_PD_ARTICULATION = EntityArticulationInfoCfg(
+  actuators=tuple(
+    _builtin_position_to_ideal_pd(actuator)
+    for actuator in G1_ARTICULATION.actuators
+    if isinstance(actuator, BuiltinPositionActuatorCfg)
+  ),
+  soft_joint_pos_limit_factor=G1_ARTICULATION.soft_joint_pos_limit_factor,
+)
+
+
+def get_g1_klavier_robot_cfg_ideal_pd() -> EntityCfg:
+  """Klavier G1 with deploy-style explicit motor PD (``IdealPdActuator``)."""
+  return EntityCfg(
+    init_state=KNEES_BENT_KEYFRAME,
+    collisions=(FULL_COLLISION,),
+    spec_fn=get_klavier_spec,
+    articulation=G1_KLAVIER_IDEAL_PD_ARTICULATION,
   )
 
 

@@ -775,6 +775,26 @@ def unitree_g1_klavier_legacy512_ball_temporal_flat_env_cfg(
   return cfg
 
 
+def unitree_g1_klavier_legacy512_motor_pd_legacy_rewards_flat_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """Legacy512 Teacher with explicit ``IdealPdActuator`` (deploy-style motor PD).
+
+  Keeps Envelope30 + action_acc smoothness rewards and zero ball XY noise.
+  """
+  from mjlab.asset_zoo.robots.unitree_g1.g1_constants import (
+    get_g1_klavier_robot_cfg_ideal_pd,
+  )
+
+  cfg = unitree_g1_klavier_legacy512_ball_temporal_flat_env_cfg(
+    ball_position_noise_meters=0.0,
+    legacy_smoothness_rewards=True,
+    play=play,
+  )
+  cfg.scene.entities["robot"] = get_g1_klavier_robot_cfg_ideal_pd()
+  return cfg
+
+
 def _align_isaaclab_actor_observation_randomization(
   cfg: ManagerBasedRlEnvCfg,
 ) -> None:

@@ -217,3 +217,18 @@ def unitree_g1_klavier_legacy512_ball_temporal_ppo_runner_cfg() -> (
   cfg.max_iterations = 50_001
   cfg.upload_model = False
   return cfg
+
+
+def unitree_g1_klavier_legacy512_motor_pd_ppo_runner_cfg() -> (
+  RslRlOnPolicyRunnerCfg
+):
+  """Train a Legacy512 Teacher from Walk under explicit motor PD."""
+  cfg = unitree_g1_klavier_legacy512_ball_temporal_ppo_runner_cfg()
+  cfg.experiment_name = "g1_velocity_football_klavier_legacy512_motor_pd"
+  cfg.max_iterations = 30_000
+  cfg.save_interval = 1000
+  cfg.run_name = (
+    "KlavierLegacy512_MotorPD_IdealPd_Envelope30_ActionAcc01_BallNoise0cm_"
+    "FromWalk20k_seed42_30k_wandb"
+  )
+  return cfg

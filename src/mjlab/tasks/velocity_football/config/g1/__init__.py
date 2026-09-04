@@ -7,12 +7,14 @@ from .env_cfgs import (
   unitree_g1_flat_env_cfg,
   unitree_g1_klavier_ball_temporal_flat_env_cfg,
   unitree_g1_klavier_legacy512_ball_temporal_flat_env_cfg,
+  unitree_g1_klavier_legacy512_motor_pd_legacy_rewards_flat_env_cfg,
   unitree_g1_long_dropout10_envelope30_legacy_curriculum_flat_env_cfg,
 )
 from .rl_cfg import (
   unitree_g1_factorial_ppo_runner_cfg,
   unitree_g1_klavier_ball_temporal_ppo_runner_cfg,
   unitree_g1_klavier_legacy512_ball_temporal_ppo_runner_cfg,
+  unitree_g1_klavier_legacy512_motor_pd_ppo_runner_cfg,
   unitree_g1_klavier_legacy512_walk_ppo_runner_cfg,
   unitree_g1_klavier_replica_ppo_runner_cfg,
   unitree_g1_legacy_xml_legacy512_walk_ppo_runner_cfg,
@@ -54,6 +56,10 @@ KLAVIER_LEGACY512_TEACHER_LEGACY_REWARDS_NOISE0_TASK_ID = (
 KLAVIER_LEGACY512_TEACHER_LEGACY_REWARDS_NOISE5CM_TASK_ID = (
   "Mjlab-Velocity-Football-KlavierReplica-Legacy512-NoPushCurr-"
   "LegacyRewards-BallNoise5cm-BallTemporal-Flat-Unitree-G1"
+)
+KLAVIER_LEGACY512_TEACHER_MOTOR_PD_LEGACY_REWARDS_NOISE0_TASK_ID = (
+  "Mjlab-Velocity-Football-KlavierReplica-Legacy512-MotorPD-IdealPd-"
+  "NoPushCurr-LegacyRewards-BallNoise0-BallTemporal-Flat-Unitree-G1"
 )
 
 
@@ -138,6 +144,16 @@ _register_legacy512_teacher(
   KLAVIER_LEGACY512_TEACHER_LEGACY_REWARDS_NOISE5CM_TASK_ID,
   0.05,
   legacy_smoothness_rewards=True,
+)
+
+register_mjlab_task(
+  task_id=KLAVIER_LEGACY512_TEACHER_MOTOR_PD_LEGACY_REWARDS_NOISE0_TASK_ID,
+  env_cfg=unitree_g1_klavier_legacy512_motor_pd_legacy_rewards_flat_env_cfg(),
+  play_env_cfg=unitree_g1_klavier_legacy512_motor_pd_legacy_rewards_flat_env_cfg(
+    play=True
+  ),
+  rl_cfg=unitree_g1_klavier_legacy512_motor_pd_ppo_runner_cfg(),
+  runner_cls=VelocityOnPolicyRunner,
 )
 
 register_mjlab_task(
